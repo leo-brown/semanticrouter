@@ -4,7 +4,7 @@
  * No action writes to the source exports or connects to a router.
  */
 import { state, clone, current } from './state.js';
-import { $, esc, notify, download } from './dom.js';
+import { $, esc, notify, download, engineStatus } from './dom.js';
 import { startEngine, callEngine } from './engine.js';
 import {
   configureViews,
@@ -15,6 +15,15 @@ import {
   renderInspector,
   renderFindings,
 } from './views.js';
+import {
+  initializeWorkbench,
+  renderWorkbench,
+  openEvidence,
+  attachSource,
+  resetWorkbench,
+  refreshTests,
+  workflowSnapshot,
+} from './workbench.js';
 
 /** Change inspector focus and clear stale export output; the semantic models stay untouched. */
 function select(name) {
@@ -217,10 +226,12 @@ async function runChecks(showNotice = true) {
     const result = await callEngine('audit');
     if (revision === state.revision) {
       state.findings = result.findings;
+      state.ruleResults = result.rule_results || [];
       renderSidebar();
       renderMetrics();
       renderMap();
       renderFindings();
+      refreshTests();
       if (showNotice)
         notify(
           'Checks completed with the deterministic Python engine. No config was sent for ML processing.',
@@ -232,7 +243,7 @@ async function runChecks(showNotice = true) {
     state.busy--;
     if (!state.busy) {
       $('#run-checks').disabled = false;
-      $('#run-checks').textContent = '▶ Run all checks';
+      $('#run-checks').textContent = '▶ Run tests';
     }
   }
 }
@@ -251,6 +262,7 @@ async function importConfig(name, text, version = '') {
   if (index === -1) state.routers.push(result.router);
   else state.routers[index] = result.router;
   if (!state.originals.has(name)) state.originals.set(name, clone(result.router));
+  attachSource(name, text);
   state.modified.add(name);
   state.selected = name;
   state.revision++;
@@ -271,6 +283,7 @@ async function main() {
     state.selected =
       state.routers.find((r) => r.name === 'bng-X1')?.name || state.routers[0].name;
     $('#snapshot-mode').textContent = data.mode;
+    initializeWorkbench(data, { runChecks, render, select });
     render();
     startEngine(
       () => {
@@ -301,6 +314,7 @@ function bindModel(r) {
       const result = await callEngine('audit', { routers });
       state.routers = routers;
       state.findings = result.findings;
+      state.ruleResults = result.rule_results || [];
       state.modified.add(r.name);
       state.revision++;
       render();
@@ -312,7 +326,14 @@ function bindModel(r) {
   $('#download-model').onclick = () => download(r.name + '.json', r);
 }
 
-configureViews({ select, bindExperiments, bindExport, bindModel });
+configureViews({
+  select,
+  bindExperiments,
+  bindExport,
+  bindModel,
+  renderWorkbench,
+  openEvidence,
+});
 
 // Bind page-level controls once. Inspector controls are rebound after each render.
 $('#edit-policy').onclick = () => {
@@ -331,6 +352,7 @@ $('#policy-form').onsubmit = async (event) => {
     state.policy = policy;
     state.policyModified = true;
     state.findings = result.findings;
+    state.ruleResults = result.rule_results || [];
     state.revision++;
     $('#policy-dialog').close();
     render();
@@ -361,6 +383,7 @@ $('#reset-all').onclick = async () => {
   state.policyModified = false;
   state.revision++;
   if (!current()) state.selected = state.routers[0].name;
+  resetWorkbench();
   render();
   if (state.engineReady) await runChecks(false);
   notify('Workspace restored to the bundled snapshot.');
@@ -369,10 +392,13 @@ $('#download-workspace').onclick = () =>
   download('semanticrouter-workspace.json', {
     routers: state.routers,
     policy: state.policy,
+    ...workflowSnapshot(),
   });
 $('#download-report').onclick = () =>
   download('semanticrouter-report.json', {
     kind: 'configuration-only',
+    rules: state.rules,
+    rule_results: state.ruleResults,
     findings: state.findings,
     modified: [...state.modified],
   });

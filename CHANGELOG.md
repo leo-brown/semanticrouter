@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- IDE configuration flow with source/model drafts, rule files, test inspection and
+  export.
+- Reusable declarative field, packet, reciprocal-peer and route-filter assertions.
+- Rule builder and JSON authoring, role/name scopes, validated save and browser
+  persistence.
+- Credential-redacted source views, line navigation, model diffs and workspace restore.
+- Inventory uncertainty separated from actionable findings; explicit source mapping
+  gaps.
+
 ## 0.1.0
 
 - RouterOS 6/7 non-executing export parser and vendor feature adapters.

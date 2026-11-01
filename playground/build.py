@@ -9,6 +9,7 @@ import base64
 import json
 import shutil
 import sys
+from dataclasses import asdict
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -47,6 +48,8 @@ def build(
         "dom.js",
         "engine.js",
         "views.js",
+        "workbench.js",
+        "ide.css",
     ):
         shutil.copyfile(ROOT / "playground" / name, output / name)
     runtime = output / "runtime"
@@ -100,6 +103,11 @@ def build(
             bundle[str(path.relative_to(ROOT))] = path.read_text()
     bundle["playground_bridge.py"] = (ROOT / "playground/bridge.py").read_text()
     (output / "engine.json").write_text(json.dumps(bundle))
+    from semanticrouter.redaction import redact_export
+    from semanticrouter.rules import run_rules
+
+    sources = {}
+    rules = json.loads((ROOT / "playground/templates/rules.json").read_text())
     policy = json.loads((ROOT / "examples/brighton.json").read_text())
     if snapshot:
         from semanticrouter.serialization import router_from_dict
@@ -108,11 +116,20 @@ def build(
         routers = [router_from_dict(value) for value in values["routers"]]
         policy = values["policy"]
         mode = values.get("mode", "saved semantic snapshot")
+        sources = {
+            name: redact_export(text)
+            for name, text in values.get("sources", {}).items()
+        }
+        rules = values.get("rules", rules)
     elif config_dir:
         routers = [
             load(Path(config_dir) / (name + ".cfg")) for name in policy["devices"]
         ]
         mode = "private estate snapshot"
+        sources = {
+            name: redact_export((Path(config_dir) / (name + ".cfg")).read_text())
+            for name in policy["devices"]
+        }
     else:
         router = load(ROOT / "tests/fixtures/routeros6.rsc")
         router.name = "example-bng"
@@ -124,6 +141,13 @@ def build(
             "public_prefixes": ["203.0.113.0/24"],
         }
         mode = "synthetic demo"
+        sources = {
+            router.name: redact_export(
+                (ROOT / "tests/fixtures/routeros6.rsc").read_text()
+            )
+        }
+        rules = [rules[0]]
+        rules[0]["assert"]["source"] = "198.51.100.9"
     values = [r.to_dict() for r in routers]
 
     # Remove local machine paths; keep file/line evidence without transporting raw exports.
@@ -148,6 +172,10 @@ def build(
             "policy": policy,
             "findings": [f.to_dict() for f in audit(routers, policy)],
             "mode": mode,
+            "sources": sources,
+            "sources_redacted": True,
+            "rules": rules,
+            "rule_results": [asdict(result) for result in run_rules(routers, rules)],
         }
     )
     if visualiser:
@@ -186,7 +214,7 @@ def build(
     else:
         (output / "data.json").write_text(json.dumps(data))
     print(
-        f"Built {len(routers)} semantic snapshots ({mode}) in {output}. No raw configs included."
+        f"Built {len(routers)} semantic snapshots ({mode}) in {output}. Credential-redacted source views included."
     )
 
 

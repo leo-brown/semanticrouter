@@ -7,6 +7,8 @@ from pathlib import Path
 
 from semanticrouter import UnsupportedExport, export_router, load
 from semanticrouter.policy import audit
+from semanticrouter.redaction import redact_export
+from semanticrouter.rules import run_rules
 
 
 @unittest.skipUnless(
@@ -59,3 +61,41 @@ class EstateTests(unittest.TestCase):
                 '"serial_number":',
             ):
                 self.assertNotIn(key, text)
+
+    def test_authored_rules_evaluate_private_models_and_mutations(self):
+        from copy import deepcopy
+
+        rules = json.loads(
+            (Path(__file__).parents[1] / "playground/templates/rules.json").read_text()
+        )
+        results = run_rules(self.routers, rules)
+        self.assertEqual(len(results), len(rules) * 12)
+        self.assertTrue(
+            all(r.status in {"pass", "fail", "unknown", "skip"} for r in results)
+        )
+        router = deepcopy(next(r for r in self.routers if r.role == "bng"))
+        assertion = next(rule for rule in rules if rule["id"] == "bng-conntrack")
+        router.firewall_v4.connection_tracking = False
+        self.assertEqual(run_rules([router], [assertion])[0].status, "pass")
+        router.firewall_v4.connection_tracking = True
+        self.assertEqual(run_rules([router], [assertion])[0].status, "fail")
+
+    def test_bundled_sources_do_not_include_private_credential_values(self):
+        import re
+
+        root = Path(os.environ["SEMANTICROUTER_CONFIG_DIR"])
+        for name in self.policy["devices"]:
+            original = (root / (name + ".cfg")).read_text()
+            redacted = redact_export(original)
+            self.assertEqual(len(original.splitlines()), len(redacted.splitlines()))
+            for match in re.finditer(
+                r'\b(?:password|secret|private-key|preshared-key)=("(?:\\.|[^"\\])*"|[^\s]+)',
+                original,
+            ):
+                credential = match.group(1).strip('"')
+                if len(credential) >= 6:
+                    # Compare in memory; assertion text deliberately never includes a credential.
+                    self.assertFalse(
+                        credential in redacted,
+                        "A private credential remains in the source view",
+                    )

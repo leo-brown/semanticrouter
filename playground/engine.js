@@ -65,6 +65,8 @@ export function callEngine(action, extra = {}) {
       routers: state.routers,
       policy: state.policy,
       selected: state.selected,
+      rules: state.rules || [],
+      include_estate: state.includeEstate !== false,
       ...extra,
     });
   });

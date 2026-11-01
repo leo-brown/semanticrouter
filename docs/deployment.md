@@ -42,14 +42,20 @@ python3 playground/build.py --download-runtime \
 ```
 
 `examples/brighton.json` selects the twelve estate filenames. The output contains
-semantic snapshots and baseline findings, not original config text or PPP/RADIUS
-credentials. The snapshots still contain topology, interface comments, addressing and
-policy: keep an estate build behind access control.
+semantic snapshots, baseline findings, starter rule files and credential-redacted source
+views with original physical line numbers. Credential-bearing records are omitted and
+common password/key fields masked. Review copies are not restorable backups; reimporting
+one adds a diagnostic that blocks a complete-conversion claim. They still contain
+topology, interface comments, addressing and policy: keep an estate build behind access
+control and review redaction before sharing unfamiliar vendor exports.
 
 The output directory is generated content. Do not use a source directory as an output
 target. Snapshots reflect build-time exports; rebuild after collecting new backups or
-use **Load config** in the browser. Changing a model never edits the source file.
-Downloads are the explicit way to retain experiments.
+use **Load config** in the browser. Changing a model never edits the source file. Rules
+are also saved in browser local storage. **Save workspace** downloads model, source and
+rule data; **Open workspace** validates and restores it. Locally loaded source exports
+remain in memory until a user explicitly downloads a workspace containing them; such a
+download may contain original credentials.
 
 To rebuild a downloaded workspace without its original configs:
 
@@ -59,8 +65,8 @@ python3 playground/build.py --runtime-dir /path/to/pyodide-core \
 ```
 
 The supplied models are hydrated with the same strict serializer, then audited again.
-Their saved policy travels with them. Use either `--snapshot` or `--config-dir`, not
-both.
+Their saved policy and rule definitions travel with them. Attached sources are redacted
+again during a build. Use either `--snapshot` or `--config-dir`, not both.
 
 ## Optional PHP Visualiser integration
 

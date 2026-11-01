@@ -18,6 +18,7 @@ function render() {
   renderMap();
   renderInspector();
   renderFindings();
+  actions.renderWorkbench?.();
 }
 
 /** Render inventory search, selection and priority badges using escaped model names. */
@@ -66,7 +67,7 @@ function renderMetrics() {
     ['unknown', 'UNKNOWN'],
   ])
     $('#metric-' + id).textContent = state.findings.filter(
-      (f) => f.severity === severity,
+      (f) => f.severity === severity && f.check !== 'firmware.exact-version',
     ).length;
 }
 
@@ -200,15 +201,9 @@ function renderObjects(r) {
         kv('DNS', r.dns.join(', ') || 'not set'),
     ) +
     card(
-      'Import coverage',
-      r.unexported.length + ' uncovered',
-      `<p class="helper">${r.unexported.length} source commands are outside full export coverage. The model is an inspection subset, not a complete vendor configuration.</p>` +
-        r.diagnostics
-          .map(
-            (d) =>
-              `<div class="rule"><code>${esc(d.code)}<br>${esc(d.message)}</code></div>`,
-          )
-          .join(''),
+      'Source evidence',
+      r.unexported.length + ' conversion gaps',
+      '<p class="helper">Open Export in the config flow to inspect the statements that need target mappings. Inventory metadata is available in the workbench context panel.</p>',
     )
   );
 }
@@ -240,8 +235,7 @@ function renderInspector() {
   $('#selected-platform').textContent =
     (r.platform.hardware || 'Hardware unknown') +
     ' · RouterOS ' +
-    (r.platform.version ||
-      (r.platform.family || '?') + '.x inferred · exact version unknown');
+    (r.platform.version || (r.platform.family || '?') + '.x');
   $('#edited-badge').hidden = !state.modified.has(r.name);
   document
     .querySelectorAll('[data-tab]')
@@ -269,6 +263,7 @@ function renderFindings() {
     severity = $('#severity-filter').value;
   const items = state.findings.filter(
     (f) =>
+      f.check !== 'firmware.exact-version' &&
       (scope !== 'selected' || f.device === state.selected) &&
       (severity === 'all' || f.severity === severity),
   );
@@ -279,13 +274,20 @@ function renderFindings() {
     items
       .map(
         (f) =>
-          `<tr><td><span class="severity ${esc(f.severity)}">${esc(f.severity)}</span></td><td><button class="table-device" data-finding-device="${esc(f.device)}">${esc(f.device)}</button></td><td>${esc(f.check)}</td><td>${esc(f.message)}</td><td>${f.source ? esc(f.source.path.split('/').pop() + ':' + f.source.line) : 'model'}</td></tr>`,
+          `<tr><td><span class="severity ${esc(f.severity)}">${esc(f.severity)}</span></td><td><button class="table-device" data-finding-device="${esc(f.device)}">${esc(f.device)}</button></td><td>${esc(f.check)}</td><td>${esc(f.message)}</td><td><button class="evidence-link" data-evidence="${state.findings.indexOf(f)}">${f.rule_id ? 'Open rule' : f.source ? esc(f.source.path.split('/').pop() + ':' + f.source.line) : 'Inspect model'}</button></td></tr>`,
       )
       .join('') ||
     '<tr><td colspan="5"><div class="empty-state">No findings match this view. Unknowns remain separate from passes.</div></td></tr>';
   $('#findings-body')
     .querySelectorAll('[data-finding-device]')
     .forEach((b) => (b.onclick = () => actions.select(b.dataset.findingDevice)));
+  $('#findings-body')
+    .querySelectorAll('[data-evidence]')
+    .forEach(
+      (button) =>
+        (button.onclick = () =>
+          actions.openEvidence?.(state.findings[Number(button.dataset.evidence)])),
+    );
   $('#check-summary').textContent =
     (state.engineReady
       ? 'Same Python policy engine as the CLI'

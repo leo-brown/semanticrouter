@@ -7,8 +7,9 @@
       name="description"
       content="Inspect router models, experiment with configuration, and run deterministic network policy checks."
     />
-    <title>SemanticRouter · Playground</title>
+    <title>SemanticRouter · Config Workbench</title>
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="ide.css" />
   </head>
   <body>
     <!-- Header: runtime status is distinct from the availability of cached snapshot data. -->
@@ -17,11 +18,11 @@
         ><span class="logo">⤨</span
         ><span
           >Semantic<span class="brand-light">Router</span
-          ><small>CONFIGURATION PLAYGROUND</small></span
+          ><small>CONFIG WORKBENCH</small></span
         ></a
       >
       <div class="top-status">
-        <span class="pill"><i></i> Deterministic checks · No ML</span
+        <span class="pill"><i></i> Local semantic workspace</span
         ><span id="engine-status" role="status">Starting Python engine…</span>
       </div>
       <button id="upload-button" class="button">↥ Load config</button
@@ -38,27 +39,68 @@
           ><input id="search" placeholder="Find a router…" aria-label="Find a router"
         /></label>
         <div id="device-list"></div>
+        <section class="rule-explorer">
+          <div class="sidebar-title"><span>RULE FILES</span></div>
+          <div id="rule-files"></div>
+          <label class="new-template"
+            ><select id="new-rule-kind" aria-label="New rule template">
+              <option value="packet">Monitoring packet</option>
+              <option value="field">Model assertion</option>
+              <option value="peers">BGP peer mesh</option>
+              <option value="route">Route decision</option>
+            </select></label
+          ><button id="new-rule" class="button">+ New rule</button>
+        </section>
         <div class="sidebar-footer">
-          <span class="eyebrow">YOUR EXPERIMENTS</span>
-          <p>Changes live in this tab.<br />Reset to return to the snapshot.</p>
+          <span class="eyebrow">PROJECT</span>
+          <p>
+            Rule files are retained in this browser.<br />Download a workspace to keep
+            model and source edits.
+          </p>
           <button id="reset-all" class="text-button">↶ Reset workspace</button
-          ><button id="download-workspace" class="text-button">↓ Download models</button
-          ><span id="snapshot-mode"></span>
+          ><button id="download-workspace" class="text-button">↓ Save workspace</button
+          ><button id="open-workspace" class="text-button">↥ Open workspace</button
+          ><input id="workspace-input" type="file" accept=".json" hidden /><span
+            id="snapshot-mode"
+          ></span>
         </div>
       </aside>
       <main>
         <div class="page-heading">
           <div>
-            <div class="eyebrow">NETWORK INTELLIGENCE, FROM CONFIGURATION</div>
-            <h1>Understand. Change. Verify.</h1>
-            <p>A working model of your network. Explore the intent behind the lines.</p>
+            <div class="eyebrow">CONFIGURATION → MODEL → INTENT → TESTS</div>
+            <h1>Design the network you intend.</h1>
+            <p>
+              Author rules, work through configuration changes, and test the result
+              before exporting.
+            </p>
           </div>
           <div class="inline-actions">
-            <button id="edit-policy" class="button">Edit policy</button
-            ><button id="run-checks" class="button primary">▶ Run all checks</button>
+            <button id="edit-policy" class="button">Estate settings</button
+            ><button id="run-checks" class="button primary">▶ Run tests</button>
           </div>
         </div>
+        <button id="ide-overview" class="text-button overview-toggle">
+          Network overview
+        </button>
         <div id="notice" class="notice" role="status" hidden></div>
+
+        <section
+          id="config-workbench"
+          class="config-workbench"
+          aria-label="Configuration workflow"
+        >
+          <nav id="ide-flow" class="ide-flow" aria-label="Configuration stages"></nav>
+          <div class="ide-toolbar">
+            <span id="ide-filepath"></span
+            ><button id="ide-primary" class="button primary">Parse → model</button>
+          </div>
+          <div class="ide-columns">
+            <div id="ide-editor" class="ide-editor"></div>
+            <aside id="ide-context" class="ide-context"></aside>
+          </div>
+          <div id="ide-status" class="ide-status" role="status"></div>
+        </section>
 
         <!-- Finding totals summarize reported failures and unknowns, not connectivity. -->
         <section class="metrics" aria-label="Workspace summary">
@@ -131,7 +173,7 @@
           <div class="findings-heading">
             <div>
               <span class="eyebrow">POLICY ASSERTIONS</span>
-              <h2>What needs attention <span id="findings-count"></span></h2>
+              <h2>Problems to resolve <span id="findings-count"></span></h2>
             </div>
             <div class="filters">
               <label
@@ -157,7 +199,7 @@
                   <th>Router</th>
                   <th>Check</th>
                   <th>Finding</th>
-                  <th>Evidence</th>
+                  <th>Open</th>
                 </tr>
               </thead>
               <tbody id="findings-body"></tbody>

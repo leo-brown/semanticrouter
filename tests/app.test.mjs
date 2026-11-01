@@ -11,6 +11,7 @@ test('standalone startup, JSON edit and reset work through the real module graph
     location: globalThis.location,
     Worker: globalThis.Worker,
     fetch: globalThis.fetch,
+    localStorage: globalThis.localStorage,
   };
   const elements = new Map();
   const tabs = ['objects', 'experiment', 'export', 'json'].map((tab) => ({
@@ -25,6 +26,9 @@ test('standalone startup, JSON edit and reset work through the real module graph
         textContent: '',
         hidden: true,
         classList: { toggle() {} },
+        setAttribute() {},
+        append() {},
+        parentElement: { querySelector: () => ({ textContent: '' }) },
         querySelectorAll() {
           return [];
         },
@@ -32,8 +36,9 @@ test('standalone startup, JSON edit and reset work through the real module graph
     return elements.get(selector);
   };
   globalThis.document = {
-    body: { dataset: {} },
+    body: { dataset: {}, classList: { toggle() {} } },
     querySelector: element,
+    createElement: () => ({ innerHTML: '' }),
     querySelectorAll(selector) {
       return selector === '[data-tab]' ? tabs : [];
     },
@@ -56,8 +61,29 @@ test('standalone startup, JSON edit and reset work through the real module graph
     diagnostics: [],
     unexported: [],
   };
+  const saved = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => saved.get(key),
+    setItem: (key, value) => saved.set(key, value),
+  };
+  const definition = {
+    id: 'snmp',
+    name: 'Monitoring access',
+    scope: {},
+    enabled: true,
+    severity: 'P1',
+    assert: {
+      type: 'packet',
+      source: '198.51.100.9',
+      protocol: 'udp',
+      port: 161,
+      decision: 'accept',
+    },
+  };
+  const requests = [];
   const snapshot = {
     routers: [router],
+    rules: [definition],
     policy: { snmp_pollers: [] },
     findings: [],
     mode: 'synthetic demo',
@@ -68,6 +94,7 @@ test('standalone startup, JSON edit and reset work through the real module graph
   };
   globalThis.Worker = class {
     postMessage(message) {
+      requests.push(message);
       queueMicrotask(() =>
         this.onmessage({
           data:
@@ -92,6 +119,45 @@ test('standalone startup, JSON edit and reset work through the real module graph
     await element('#model-form').onsubmit({ preventDefault() {} });
     assert.equal(state.routers[0].identity, 'edited-demo');
     assert.equal(state.modified.has('demo'), true);
+
+    const { openEvidence } = await import('../playground/workbench.js');
+    openEvidence({ device: 'demo', rule_id: 'snmp' });
+    const updated = { ...definition, name: 'Author edited rule' };
+    element('#rule-definition').value = JSON.stringify(updated);
+    element('#rule-definition').oninput();
+    assert.equal(
+      state.rules[0].name,
+      'Monitoring access',
+      'drafts do not change saved tests',
+    );
+    await element('#ide-primary').onclick();
+    assert.equal(state.rules[0].name, 'Author edited rule');
+    assert.equal(
+      JSON.parse(saved.get('semanticrouter-rule-files-v1'))[0].name,
+      'Author edited rule',
+    );
+    assert.ok(
+      requests.some(
+        (request) =>
+          request.action === 'rules_validate' &&
+          request.rules[0].name === 'Author edited rule',
+      ),
+    );
+    assert.ok(
+      requests.some(
+        (request) =>
+          request.action === 'audit' && request.rules[0].name === 'Author edited rule',
+      ),
+    );
+    element('#rule-definition').value = '{ invalid';
+    element('#rule-definition').oninput();
+    await element('#ide-primary').onclick();
+    assert.equal(
+      state.rules[0].name,
+      'Author edited rule',
+      'invalid JSON never replaces a saved rule',
+    );
+    assert.notEqual(element('#ide-error').textContent, '');
 
     await element('#reset-all').onclick();
     assert.equal(state.routers[0].identity, 'demo');

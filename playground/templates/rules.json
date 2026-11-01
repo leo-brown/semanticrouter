@@ -1,0 +1,62 @@
+[
+  {
+    "id": "monitoring-snmp",
+    "name": "Monitoring can poll every node",
+    "description": "Require the monitoring source to be accepted by ordered IPv4 input policy.",
+    "enabled": true,
+    "severity": "P1",
+    "scope": {},
+    "assert": {
+      "type": "packet",
+      "source": "35.189.90.14",
+      "protocol": "udp",
+      "port": 161,
+      "decision": "accept"
+    }
+  },
+  {
+    "id": "bng-border-mesh",
+    "name": "BNGs peer with both borders",
+    "description": "Require enabled reciprocal endpoint definitions on both borders.",
+    "enabled": true,
+    "severity": "P1",
+    "scope": {
+      "roles": ["bng"]
+    },
+    "assert": {
+      "type": "peers",
+      "targets": ["border-X", "border-Y"],
+      "reciprocal": true
+    }
+  },
+  {
+    "id": "bng-conntrack",
+    "name": "BNG connection tracking is disabled",
+    "enabled": true,
+    "severity": "P1",
+    "scope": {
+      "roles": ["bng"]
+    },
+    "assert": {
+      "type": "field",
+      "path": "firewall_v4.connection_tracking",
+      "operator": "equals",
+      "value": false
+    }
+  },
+  {
+    "id": "bng-radius-pair",
+    "name": "BNGs define two RADIUS servers",
+    "enabled": true,
+    "severity": "P1",
+    "scope": {
+      "roles": ["bng"]
+    },
+    "assert": {
+      "type": "field",
+      "path": "radius",
+      "operator": "count_at_least",
+      "value": 2
+    }
+  }
+]

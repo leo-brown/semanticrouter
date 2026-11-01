@@ -51,10 +51,18 @@ Visualiser, database, Sites account, API key, or external application. The build
 downloads pinned Pyodide assets once; generated pages serve the Python runtime and
 middleware from the same origin. System fonts require no external stylesheet.
 
-Select a router to inspect its objects. Experiment with rules, peers, MTUs and RADIUS
-settings; probe packets/routes; edit typed model JSON and policy; preview exports;
-download results or reset. Processing is deterministic and stays in the browser. Model
-edits rerun assertions without reprocessing their source exports.
+The workbench follows **source → semantic model → rule files → test results → export**.
+Select a router, edit its source or model, and define reusable rules using a form or
+JSON. Rules can assert model fields/collections, ordered input-firewall decisions,
+reciprocal BGP peerings, and route-filter decisions. Scope them to roles or named
+routers. Save a rule to evaluate it against the current models; inspect pass, fail,
+unknown and skipped results with links back to the rule or source evidence.
+
+Saved rules persist in this browser. Download a workspace to retain models, rule files,
+policy and attached sources together. Model edits rerun assertions without reparsing
+exports. No ML service or connectivity probes are involved. The optional network
+overview remains available alongside the editors. See [authoring rules](docs/rules.md)
+for the rule schema, examples and result semantics.
 
 See [deployment](docs/deployment.md) for private datasets, offline runtime copies, saved
 workspaces, and the optional authenticated PHP Visualiser integration.

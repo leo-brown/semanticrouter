@@ -6,7 +6,9 @@ from ipaddress import ip_address, ip_network
 
 from semanticrouter.adapters.routeros import RouterOSRouter
 from semanticrouter.export import export_router
+from semanticrouter.model import Diagnostic
 from semanticrouter.policy import audit, input_decision, route_decision
+from semanticrouter.rules import run_rules, validate_rules
 from semanticrouter.serialization import router_from_dict
 
 
@@ -20,6 +22,10 @@ def handle(request_json):
     try:
         request = json.loads(request_json)
         action = request["action"]
+        if action == "rules_validate":
+            return json.dumps(
+                {"ok": True, "rules": validate_rules(request.get("rules", []))}
+            )
         if action == "import":
             router = RouterOSRouter(
                 request["name"],
@@ -27,6 +33,13 @@ def handle(request_json):
                 path=request["name"] + ".cfg",
                 version=request.get("version") or None,
             ).to_common()
+            if request.get("redacted"):
+                router.diagnostics.append(
+                    Diagnostic(
+                        "redacted-source",
+                        "This source view omits credentials or private records; use an original export for complete conversion.",
+                    )
+                )
             return json.dumps({"ok": True, "router": router.to_dict()})
         routers = [router_from_dict(value) for value in request["routers"]]
         if action == "audit":
@@ -59,8 +72,33 @@ def handle(request_json):
                         raise ValueError(
                             "Customer-prefix proof currently supports IPv4 /24 aggregates"
                         )
-            findings = audit(routers, policy)
-            return json.dumps({"ok": True, "findings": [asdict(f) for f in findings]})
+            findings = (
+                [asdict(f) for f in audit(routers, policy)]
+                if request.get("include_estate", True)
+                else []
+            )
+            results = run_rules(routers, request.get("rules", []))
+            for result in results:
+                if result.status in ("fail", "unknown"):
+                    findings.append(
+                        {
+                            "device": result.device,
+                            "check": "custom." + result.rule_id,
+                            "severity": "UNKNOWN"
+                            if result.status == "unknown"
+                            else result.severity,
+                            "message": result.rule_name + ": " + result.message,
+                            "source": asdict(result.source) if result.source else None,
+                            "rule_id": result.rule_id,
+                        }
+                    )
+            return json.dumps(
+                {
+                    "ok": True,
+                    "findings": findings,
+                    "rule_results": [asdict(result) for result in results],
+                }
+            )
         selected = next(r for r in routers if r.name == request["selected"])
         if action == "probe":
             if request["kind"] == "firewall":
