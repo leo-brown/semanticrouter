@@ -80,9 +80,14 @@
             ><button id="run-checks" class="button primary">▶ Run tests</button>
           </div>
         </div>
-        <button id="ide-overview" class="text-button overview-toggle">
-          Network overview
-        </button>
+        <div class="view-switch" role="group" aria-label="Workspace view">
+          <button id="ide-workbench" class="view-button active" aria-pressed="true">
+            Config workbench
+          </button>
+          <button id="ide-overview" class="view-button" aria-pressed="false">
+            Network model
+          </button>
+        </div>
         <div id="notice" class="notice" role="status" hidden></div>
 
         <section

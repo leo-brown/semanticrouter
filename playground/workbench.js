@@ -140,8 +140,13 @@ export function initializeWorkbench(data, callbacks) {
     /* A corrupt browser preference must not prevent opening source files. */
   }
   selectedRule = state.rules[0]?.id || null;
+  // Two persistent view choices make the topology discoverable from the editor.
+  $('#ide-workbench').onclick = () => {
+    overview = false;
+    renderWorkbench();
+  };
   $('#ide-overview').onclick = () => {
-    overview = !overview;
+    overview = true;
     renderWorkbench();
   };
   $('#new-rule').onclick = () => newRule($('#new-rule-kind').value);
@@ -220,7 +225,13 @@ function focusLine(line) {
 export function renderWorkbench() {
   if (!hooks || !current()) return;
   document.body.classList.toggle('network-overview', overview);
-  $('#ide-overview').textContent = overview ? 'Config workbench' : 'Network overview';
+  for (const [id, active] of [
+    ['ide-workbench', !overview],
+    ['ide-overview', overview],
+  ]) {
+    $('#' + id).classList.toggle('active', active);
+    $('#' + id).setAttribute('aria-pressed', String(active));
+  }
   $('#config-workbench').hidden = overview;
   $('#ide-flow').innerHTML = ['source', 'model', 'rules', 'tests', 'export']
     .map(

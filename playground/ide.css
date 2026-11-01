@@ -21,8 +21,42 @@ body:not(.network-overview) .metrics {
 body:not(.network-overview) .metrics strong {
   font-size: 24px;
 }
-.overview-toggle {
-  margin-bottom: 8px;
+/* Both destinations stay visible, with a large target and explicit active state. */
+.view-switch {
+  display: inline-flex;
+  width: min(100%, 520px);
+  gap: 5px;
+  padding: 5px;
+  margin: 4px 0 20px;
+  background: #e8efeb;
+  border: 1px solid #cbd9d1;
+  border-radius: 9px;
+}
+.view-button {
+  flex: 1;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #52675e;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.view-button:hover {
+  background: #f4f8f5;
+}
+.view-button.active {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: white;
+  box-shadow: 0 2px 4px #19352a18;
+}
+.view-button:focus-visible {
+  outline: 3px solid #79af9b;
+  outline-offset: 2px;
 }
 .network-overview .workspace-grid {
   margin-top: 20px;
