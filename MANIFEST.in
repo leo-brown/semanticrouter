@@ -1,0 +1,8 @@
+include README.md LICENSE CONTRIBUTING.md CHANGELOG.md .prettierrc.json
+recursive-include docs *.md
+recursive-include examples *.json *.cfg
+recursive-include tests *.py *.mjs *.rsc
+recursive-include playground *.py *.js *.mjs *.json *.html *.css *.php
+prune playground/dist
+prune .local
+global-exclude ._* *.py[cod]

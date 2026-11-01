@@ -2,13 +2,20 @@
 
 Dataclasses only; never evaluates expressions or instantiates caller-named classes.
 """
+
 from dataclasses import fields, is_dataclass
 from types import UnionType
 from typing import Union, get_args, get_origin, get_type_hints
+
 from .model import Router
 
 
 def _decode(kind, value, path):
+    """Recursively hydrate only the declared dataclass/collection/primitive types.
+
+    Union alternatives are attempted without coercion. In particular, strings such
+    as "false" must not become truthy flags, and bool must not be accepted as int.
+    Unknown object keys are errors so misspelled policy-relevant fields cannot vanish."""
     origin = get_origin(kind)
     args = get_args(kind)
     if origin in (Union, UnionType):
@@ -17,36 +24,50 @@ def _decode(kind, value, path):
                 return _decode(alternative, value, path)
             except ValueError:
                 pass
-        raise ValueError(f'{path}: value does not match the model type')
+        raise ValueError(f"{path}: value does not match the model type")
     if kind is type(None):
         if value is not None:
-            raise ValueError(f'{path}: expected null')
+            raise ValueError(f"{path}: expected null")
         return None
     if origin is list:
         if not isinstance(value, list):
-            raise ValueError(f'{path}: expected an array')
-        return [_decode(args[0], item, f'{path}[{index}]') for index, item in enumerate(value)]
+            raise ValueError(f"{path}: expected an array")
+        return [
+            _decode(args[0], item, f"{path}[{index}]")
+            for index, item in enumerate(value)
+        ]
     if origin is dict:
         if not isinstance(value, dict):
-            raise ValueError(f'{path}: expected an object')
-        return {_decode(args[0], key, path): _decode(args[1], item, f'{path}.{key}') for key, item in value.items()}
+            raise ValueError(f"{path}: expected an object")
+        return {
+            _decode(args[0], key, path): _decode(args[1], item, f"{path}.{key}")
+            for key, item in value.items()
+        }
     if is_dataclass(kind):
         if not isinstance(value, dict):
-            raise ValueError(f'{path}: expected an object')
+            raise ValueError(f"{path}: expected an object")
         names = {f.name for f in fields(kind)}
         unknown = set(value) - names
         if unknown:
-            raise ValueError(f'{path}: unknown fields: {", ".join(sorted(unknown))}')
+            raise ValueError(f"{path}: unknown fields: {', '.join(sorted(unknown))}")
         hints = get_type_hints(kind)
-        decoded = {key: _decode(hints[key], item, f'{path}.{key}') for key, item in value.items()}
+        decoded = {
+            key: _decode(hints[key], item, f"{path}.{key}")
+            for key, item in value.items()
+        }
         try:
             return kind(**decoded)
         except TypeError as exc:
-            raise ValueError(f'{path}: missing required fields') from exc
+            raise ValueError(f"{path}: missing required fields") from exc
     if type(value) is not kind:
-        raise ValueError(f'{path}: expected {kind.__name__}')
+        raise ValueError(f"{path}: expected {kind.__name__}")
     return value
 
 
 def router_from_dict(value):
-    return _decode(Router, value, 'router')
+    """Validate a JSON object and rebuild typed nested Router dataclasses.
+
+    Raises ValueError for missing required fields, unknown keys or incompatible
+    values. This validates structure; feature evaluators still validate addresses and
+    interpret supported semantic predicates when a model is actually used."""
+    return _decode(Router, value, "router")

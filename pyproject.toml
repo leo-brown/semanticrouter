@@ -19,3 +19,17 @@ include = ["semanticrouter*"]
 
 [tool.setuptools.package-data]
 semanticrouter = ["firmware/*.json"]
+
+[project.urls]
+Repository = "https://github.com/leo-brown/semanticrouter"
+Issues = "https://github.com/leo-brown/semanticrouter/issues"
+
+[project.optional-dependencies]
+dev = ["ruff==0.17.3", "build>=1.2"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

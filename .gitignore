@@ -9,3 +9,6 @@ dist/
 ._*
 SOURCES.txt
 playground/dist/
+# Transient mounted-filesystem Git metadata is never project source.
+/index.lock
+/node_modules/
