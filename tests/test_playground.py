@@ -37,6 +37,19 @@ class PlaygroundTests(unittest.TestCase):
         self.assertEqual(result.to_dict(), self.router.to_dict())
         self.assertIsInstance(result.firewall_v4.rules[0], FirewallRule)
 
+    def test_platform_contains_only_functional_fields(self):
+        self.assertEqual(
+            set(self.router.to_dict()["platform"]),
+            {"vendor", "os", "version", "family", "hardware"},
+        )
+
+    def test_legacy_platform_evidence_is_discarded_on_restore(self):
+        data = self.router.to_dict()
+        data["platform"]["evidence"] = ["/routing bgp connection"]
+        restored = router_from_dict(data)
+        self.assertNotIn("evidence", restored.to_dict()["platform"])
+        self.assertEqual(restored.platform.family, self.router.platform.family)
+
     def test_string_boolean_is_rejected(self):
         data = self.router.to_dict()
         data["firewall_v4"]["rules"][0]["enabled"] = "false"

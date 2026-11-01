@@ -42,7 +42,9 @@ misspelled fields and coerces no values.
 
 BGP precedence is instance → inherited parent templates → child template → peer.
 Missing/cyclic templates remain diagnostic. Firmware syntax family is separate from an
-exact version; conflicting evidence is rejected. `hardware.json` is a reference registry
+exact version; conflicting evidence is rejected. The platform object exposes only vendor,
+OS, version, family and hardware; parser marker lists are not part of the model. Legacy
+workspace `platform.evidence` fields are ignored when restoring. `hardware.json` is a reference registry
 for extension, not a firmware-version inference table.
 
 ## Browser lifecycle

@@ -7,7 +7,7 @@ from dataclasses import fields, is_dataclass
 from types import UnionType
 from typing import Union, get_args, get_origin, get_type_hints
 
-from .model import Router
+from .model import Platform, Router
 
 
 def _decode(kind, value, path):
@@ -46,6 +46,10 @@ def _decode(kind, value, path):
     if is_dataclass(kind):
         if not isinstance(value, dict):
             raise ValueError(f"{path}: expected an object")
+        # Old workspaces included parser markers in platform.evidence. Accept that
+        # retired field on input only; the functional model never emits it again.
+        if kind is Platform and "evidence" in value:
+            value = {key: item for key, item in value.items() if key != "evidence"}
         names = {f.name for f in fields(kind)}
         unknown = set(value) - names
         if unknown:

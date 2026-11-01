@@ -29,14 +29,12 @@ def detect(text, paths, version=None):
     )
     if p.version:
         p.family = p.version.split(".")[0]
-        p.evidence.append("explicit override" if version else "RouterOS export header")
     hits = []
     for family in ("6", "7"):
         markers = definition("routeros-" + family)["syntax_markers"]
         found = sorted(set(paths) & set(markers))
         if found:
             hits.append(family)
-            p.evidence.extend(found)
     if len(hits) > 1 or (p.family and any(x != p.family for x in hits)):
         raise ValueError("Conflicting RouterOS syntax/version evidence")
     if not p.family and hits:

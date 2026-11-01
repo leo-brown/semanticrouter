@@ -29,7 +29,7 @@ class Diagnostic:
 
 @dataclass
 class Platform:
-    """Independent firmware and hardware evidence for a source router.
+    """Firmware selection and hardware identity for a source router.
 
     ``version`` is exact only when explicitly supplied or present in an export
     header. ``family`` may be inferred from syntax; hardware never proves firmware."""
@@ -39,7 +39,6 @@ class Platform:
     version: str | None = None
     family: str | None = None
     hardware: str | None = None
-    evidence: list[str] = field(default_factory=list)
 
 
 @dataclass
