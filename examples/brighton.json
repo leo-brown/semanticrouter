@@ -1,0 +1,7 @@
+{
+  "devices": ["edge1-hove", "core1-hove", "border-X", "border-Y", "bng-X1", "bng-X2", "bng-Y1", "bng-Y2", "switch-X1", "switch-X2", "switch-Y1", "switch-Y2"],
+  "snmp_pollers": ["35.189.90.14"],
+  "legacy_snmp_pollers": ["52.56.174.0"],
+  "borders": ["border-X", "border-Y"],
+  "public_prefixes": ["193.9.15.0/24", "193.9.29.0/24", "193.9.255.0/24", "195.10.209.0/24", "195.10.215.0/24", "195.10.222.0/24"]
+}

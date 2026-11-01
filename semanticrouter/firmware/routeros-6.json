@@ -1,0 +1,8 @@
+{
+  "vendor": "mikrotik", "os": "routeros", "family": "6",
+  "syntax_markers": ["/routing bgp peer", "/routing filter", "/routing ospf network"],
+  "bgp_path": "/routing bgp peer",
+  "bgp_fields": {"remote-address": "remote_address", "update-source": "local_address", "remote-as": "remote_as", "in-filter": "import_policy", "out-filter": "export_policy"},
+  "redistribute_flags": {"redistribute-connected": "connected", "redistribute-static": "static", "redistribute-ospf": "ospf", "redistribute-other-bgp": "bgp", "redistribute-rip": "rip"},
+  "export": false
+}

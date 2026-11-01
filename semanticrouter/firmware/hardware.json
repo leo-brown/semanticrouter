@@ -1,0 +1,4 @@
+{
+  "note": "Hardware is not a firmware version. Header model is authoritative; no exact firmware inferred from it.",
+  "families": {"CCR2216": "router", "CCR2004": "router", "CRS326": "switch", "CRS310": "switch", "CRS518": "switch"}
+}

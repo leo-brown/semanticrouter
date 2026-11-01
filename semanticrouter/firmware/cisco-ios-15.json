@@ -1,0 +1,5 @@
+{
+  "vendor": "cisco", "os": "ios", "family": "15", "import": false,
+  "export": true, "features": ["identity", "dns", "firewall_v4"],
+  "export_note": "Named IPv4 ACL artifact only; interface/control-plane attachment is deliberately left to the caller."
+}

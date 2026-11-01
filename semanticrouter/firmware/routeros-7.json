@@ -1,0 +1,10 @@
+{
+  "vendor": "mikrotik", "os": "routeros", "family": "7",
+  "syntax_markers": ["/routing bgp connection", "/routing bgp template", "/routing filter rule", "/routing ospf interface-template", "/interface wireguard"],
+  "bgp_path": "/routing bgp connection",
+  "bgp_fields": {"remote.address": "remote_address", "local.address": "local_address", "remote.as": "remote_as", "as": "local_as", "router-id": "router_id", "local.role": "role", "input.filter": "import_policy", "output.filter-chain": "export_policy", "output.default-originate": "default_originate"},
+  "export": true,
+  "export_min_version": "7.1",
+  "export_max_version_exclusive": "7.20",
+  "export_note": "BGP renderer targets pre-7.20 template/connection syntax; 7.20+ instance layout requires a separate renderer."
+}

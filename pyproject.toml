@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "semanticrouter"
+version = "0.1.0"
+description = "Router configuration adapters, a vendor-neutral semantic model, and configuration policy tests"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{name = "Leo Brown"}]
+dependencies = []
+
+[project.scripts]
+semanticrouter = "semanticrouter.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["semanticrouter*"]
+
+[tool.setuptools.package-data]
+semanticrouter = ["firmware/*.json"]
