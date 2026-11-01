@@ -41,13 +41,16 @@ python3 playground/build.py --download-runtime \
   --config-dir /path/to/net-configs --output /path/to/private-web-root
 ```
 
-`examples/brighton.json` selects the twelve estate filenames. The output contains
-semantic snapshots, baseline findings, starter rule files and credential-redacted source
-views with original physical line numbers. Credential-bearing records are omitted and
-common password/key fields masked. Review copies are not restorable backups; reimporting
-one adds a diagnostic that blocks a complete-conversion claim. They still contain
-topology, interface comments, addressing and policy: keep an estate build behind access
-control and review redaction before sharing unfamiliar vendor exports.
+By default `--config-dir` loads all non-hidden `.cfg`/`.rsc` exports with unique names.
+Use `--inventory examples/brighton.json` to select the twelve estate filenames
+explicitly. Inventory selection does not activate any tests. The output contains
+semantic snapshots, results for saved rules, optional example suites and
+credential-redacted source views with original physical line numbers. Credential-bearing
+records are omitted and common password/key fields masked. Review copies are not
+restorable backups; reimporting one adds a diagnostic that blocks a complete-conversion
+claim. They still contain topology, interface comments, addressing and policy: keep an
+estate build behind access control and review redaction before sharing unfamiliar vendor
+exports.
 
 The output directory is generated content. Do not use a source directory as an output
 target. Snapshots reflect build-time exports; rebuild after collecting new backups or
@@ -74,7 +77,8 @@ For an existing Network Visualiser with its own `auth.php`:
 
 ```sh
 python3 playground/build.py --visualiser --download-runtime \
-  --config-dir /path/to/net-configs --output /path/to/visualiser/semanticrouter
+  --config-dir /path/to/net-configs --inventory examples/brighton.json \
+  --output /path/to/visualiser/semanticrouter
 ```
 
 This mode deliberately integrates with the parent application's login. It requires

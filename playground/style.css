@@ -421,6 +421,12 @@ main {
 .map-node .node-dot.has-issues {
   background: #df9a71;
 }
+.map-node .node-dot.unvalidated {
+  background: #82939a;
+}
+.map-node .node-dot.unresolved {
+  background: #ca925a;
+}
 .map-legend {
   display: flex;
   gap: 0.875rem;

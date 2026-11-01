@@ -70,16 +70,19 @@ is a named IPv4 ACL artifact: the operator must choose its interface/control-pla
 attachment. RouterOS input has no automatic device-wide IOS ACL equivalent. There is no
 IOS importer yet. Never apply a fragment as if it were a full replacement config.
 
-## Estate assertions
+## Optional editable example suites
 
-`examples/brighton.json` contains estate intent separately from the middleware.
-`policy.audit()` operates on common objects only, with no dependency on RouterOS text.
+`semanticrouter/suites/brighton.json` contains the complete editable logic for 29 estate
+checks, including all local values. It is optional and never automatically enabled.
+`examples/brighton.json` is an inventory/legacy parameter file, not an implicit policy.
+The generic `policy.audit(routers, rules, variables)` operates only on supplied rules.
+No rules means no findings. These are example intentions, not universal standards.
 
 Implemented checks include:
 
 - Enabled, unconditional terminal IPv4 input drop/reject; rule-order-aware SNMP access
   for each canonical poller, legacy/extra monitoring sources and SNMP location.
-- RouterOS family policy and unknown exact firmware, hardware observations, identity,
+- Editable firmware-family policy and recorded exact-version requirement, identity,
   infrastructure loopbacks, DNS, explicit LACP and disabled production-looking uplinks.
 - BNG conntrack disabled; PPPoE placement, MTU, authentication and profile; PPP/RADIUS
   source identity, two RADIUS servers and ordered 500ms/2000ms timeouts.

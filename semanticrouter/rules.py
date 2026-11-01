@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from ipaddress import ip_address, ip_interface, ip_network
 
 from .evaluation import input_decision, route_decision
+from .expressions import test_expression, validate_expression
 from .model import Router, Source
 
 
@@ -42,12 +43,14 @@ def validate_rules(rules):
             "severity",
             "scope",
             "assert",
+            "params",
+            "suite",
         }:
             raise ValueError("Rule contains unsupported fields")
         identity = rule.get("id", "")
         if (
             not isinstance(identity, str)
-            or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", identity)
+            or not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", identity)
             or identity in ids
         ):
             raise ValueError(
@@ -62,6 +65,10 @@ def validate_rules(rules):
             raise ValueError(
                 identity + ": use an enabled boolean and severity P1 or P2"
             )
+        if not isinstance(rule.get("params", {}), dict) or not isinstance(
+            rule.get("suite", ""), str
+        ):
+            raise ValueError(identity + ": params must be an object and suite a string")
         scope = rule.get("scope", {})
         if not isinstance(scope, dict) or set(scope) - {"roles", "names"}:
             raise ValueError(identity + ": scope supports roles and names")
@@ -77,6 +84,7 @@ def validate_rules(rules):
             raise ValueError(identity + ": missing assert object")
         kind = assertion.get("type")
         allowed = {
+            "expression": {"type", "test"},
             "field": {"type", "path", "operator", "value"},
             "packet": {"type", "source", "protocol", "port", "decision"},
             "peers": {"type", "targets", "reciprocal"},
@@ -84,7 +92,11 @@ def validate_rules(rules):
         }
         if kind not in allowed or set(assertion) - allowed[kind]:
             raise ValueError(identity + ": unsupported assertion type or fields")
-        if kind == "field":
+        if kind == "expression":
+            if "test" not in assertion:
+                raise ValueError(identity + ": expression needs a test")
+            validate_expression(assertion["test"])
+        elif kind == "field":
             path = assertion.get("path", "")
             if (
                 not isinstance(path, str)
@@ -270,10 +282,17 @@ def _peers(router, assertion, inventory):
     )
 
 
-def run_rules(routers: list[Router], rules: list[dict]) -> list[RuleResult]:
+def run_rules(
+    routers: list[Router], rules: list[dict], variables=None
+) -> list[RuleResult]:
     """Evaluate each saved assertion against each scoped router, with explicit skips."""
     validate_rules(rules)
     inventory = {r.name: r for r in routers}
+    snapshots = (
+        {r.name: r.to_dict() for r in routers}
+        if any(rule["assert"]["type"] == "expression" for rule in rules)
+        else {}
+    )
     results = []
     for rule in rules:
         scope = rule.get("scope", {})
@@ -295,7 +314,16 @@ def run_rules(routers: list[Router], rules: list[dict]) -> list[RuleResult]:
                 assertion = rule["assert"]
                 kind = assertion["type"]
                 try:
-                    if kind == "field":
+                    if kind == "expression":
+                        status, message, observed = test_expression(
+                            assertion["test"],
+                            router,
+                            inventory,
+                            rule.get("params", {}),
+                            variables or {},
+                            snapshots,
+                        )
+                    elif kind == "field":
                         status, message, observed = _field(router, assertion)
                     elif kind == "peers":
                         status, message, observed = _peers(router, assertion, inventory)

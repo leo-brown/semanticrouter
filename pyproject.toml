@@ -18,7 +18,7 @@ semanticrouter = "semanticrouter.cli:main"
 include = ["semanticrouter*"]
 
 [tool.setuptools.package-data]
-semanticrouter = ["firmware/*.json"]
+semanticrouter = ["firmware/*.json", "suites/*.json"]
 
 [project.urls]
 Repository = "https://github.com/leo-brown/semanticrouter"

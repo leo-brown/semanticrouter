@@ -66,7 +66,6 @@ export function callEngine(action, extra = {}) {
       policy: state.policy,
       selected: state.selected,
       rules: state.rules || [],
-      include_estate: state.includeEstate !== false,
       ...extra,
     });
   });

@@ -107,24 +107,31 @@ class PlaygroundTests(unittest.TestCase):
         ):
             self.assertTrue(self.call("audit")["ok"])
 
-    def test_invalid_policy_is_rejected(self):
-        self.assertFalse(
-            self.call("audit", policy={"snmp_pollers": ["not-an-ip"]})["ok"]
-        )
-        self.assertFalse(
-            self.call("audit", policy={"public_prefixes": ["203.0.113.0/25"]})["ok"]
-        )
-        self.assertFalse(self.call("audit", policy={"made-up-rule": True})["ok"])
+    def test_variables_are_generic_but_must_be_an_object(self):
+        self.assertTrue(self.call("audit", policy={"my_service": {"port": 9999}})["ok"])
+        self.assertFalse(self.call("audit", policy=[])["ok"])
+
+    def test_no_rules_means_no_checks_even_with_legacy_flags(self):
+        response = self.call("audit", include_estate=True)
+        self.assertEqual(response["findings"], [])
+        self.assertEqual(response["rule_results"], [])
 
     def test_semantic_mutation_changes_policy_result(self):
         r = Router("switch-demo", "switch", identity="switch-demo")
         r.firewall_v4.rules = [FirewallRule("input", "drop", enabled=False)]
         self.request["routers"] = [r.to_dict()]
+        from semanticrouter.suites import example_suites
+
+        self.request["rules"] = [example_suites()[0]["rules"][0]]
         first = self.call("audit")["findings"]
-        self.assertTrue(any(f["check"] == "firewall.input-final-drop" for f in first))
+        self.assertTrue(
+            any(f["check"] == "custom.firewall.input-final-drop" for f in first)
+        )
         self.request["routers"][0]["firewall_v4"]["rules"][0]["enabled"] = True
         second = self.call("audit")["findings"]
-        self.assertFalse(any(f["check"] == "firewall.input-final-drop" for f in second))
+        self.assertFalse(
+            any(f["check"] == "custom.firewall.input-final-drop" for f in second)
+        )
 
 
 class VisualiserDeploymentTests(unittest.TestCase):

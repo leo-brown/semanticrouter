@@ -1,0 +1,2795 @@
+{
+  "id": "brighton-example",
+  "name": "Brighton Fibre example",
+  "description": "Optional estate-specific intent. Review and edit every role, address, convention and assertion before use.",
+  "rules": [
+    {
+      "id": "firewall.input-final-drop",
+      "name": "Input policy ends with an unconditional drop or reject",
+      "description": "Input policy ends with an unconditional drop or reject. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {},
+      "params": {},
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "and",
+          "args": [
+            {
+              "op": "gt",
+              "args": [
+                {
+                  "op": "length",
+                  "args": [
+                    {
+                      "op": "filter",
+                      "items": {
+                        "ref": "router.firewall_v4.rules"
+                      },
+                      "as": "f",
+                      "test": {
+                        "op": "and",
+                        "args": [
+                          {
+                            "ref": "f.enabled"
+                          },
+                          {
+                            "op": "eq",
+                            "args": [
+                              {
+                                "ref": "f.chain"
+                              },
+                              "input"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                0
+              ]
+            },
+            {
+              "op": "in",
+              "args": [
+                {
+                  "op": "get",
+                  "args": [
+                    {
+                      "op": "last",
+                      "args": [
+                        {
+                          "op": "filter",
+                          "items": {
+                            "ref": "router.firewall_v4.rules"
+                          },
+                          "as": "f",
+                          "test": {
+                            "op": "and",
+                            "args": [
+                              {
+                                "ref": "f.enabled"
+                              },
+                              {
+                                "op": "eq",
+                                "args": [
+                                  {
+                                    "ref": "f.chain"
+                                  },
+                                  "input"
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    "action"
+                  ]
+                },
+                [
+                  "drop",
+                  "reject"
+                ]
+              ]
+            },
+            {
+              "op": "unconditional",
+              "args": [
+                {
+                  "op": "last",
+                  "args": [
+                    {
+                      "op": "filter",
+                      "items": {
+                        "ref": "router.firewall_v4.rules"
+                      },
+                      "as": "f",
+                      "test": {
+                        "op": "and",
+                        "args": [
+                          {
+                            "ref": "f.enabled"
+                          },
+                          {
+                            "op": "eq",
+                            "args": [
+                              {
+                                "ref": "f.chain"
+                              },
+                              "input"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "snmp.poller",
+      "name": "Authorised pollers can reach SNMP",
+      "description": "Authorised pollers can reach SNMP. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {},
+      "params": {
+        "snmp_pollers": [
+          "35.189.90.14"
+        ],
+        "snmp_port": 161,
+        "snmp_protocol": "udp"
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "ref": "params.snmp_pollers"
+          },
+          "as": "poller",
+          "test": {
+            "op": "eq",
+            "args": [
+              {
+                "op": "packet",
+                "args": [
+                  {
+                    "ref": "router"
+                  },
+                  {
+                    "ref": "poller"
+                  },
+                  {
+                    "ref": "params.snmp_protocol"
+                  },
+                  {
+                    "ref": "params.snmp_port"
+                  }
+                ]
+              },
+              "accept"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "snmp.extra-source",
+      "name": "SNMP list contains only authorised pollers",
+      "description": "SNMP list contains only authorised pollers. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P2",
+      "scope": {},
+      "params": {
+        "snmp_group": "snmp",
+        "snmp_pollers": [
+          "35.189.90.14"
+        ]
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "op": "filter",
+            "items": {
+              "ref": "router.firewall_v4.groups"
+            },
+            "as": "g",
+            "test": {
+              "op": "and",
+              "args": [
+                {
+                  "ref": "g.enabled"
+                },
+                {
+                  "op": "eq",
+                  "args": [
+                    {
+                      "ref": "g.name"
+                    },
+                    {
+                      "ref": "params.snmp_group"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "as": "g",
+          "test": {
+            "op": "in",
+            "args": [
+              {
+                "op": "host",
+                "args": [
+                  {
+                    "ref": "g.network"
+                  }
+                ]
+              },
+              {
+                "ref": "params.snmp_pollers"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "snmp.legacy-source",
+      "name": "SNMP list excludes retired monitoring sources",
+      "description": "SNMP list excludes retired monitoring sources. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P2",
+      "scope": {},
+      "params": {
+        "legacy_snmp_pollers": [
+          "52.56.174.0"
+        ],
+        "snmp_group": "snmp"
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "op": "filter",
+            "items": {
+              "ref": "router.firewall_v4.groups"
+            },
+            "as": "g",
+            "test": {
+              "op": "and",
+              "args": [
+                {
+                  "ref": "g.enabled"
+                },
+                {
+                  "op": "eq",
+                  "args": [
+                    {
+                      "ref": "g.name"
+                    },
+                    {
+                      "ref": "params.snmp_group"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "as": "g",
+          "test": {
+            "op": "not",
+            "args": [
+              {
+                "op": "in",
+                "args": [
+                  {
+                    "op": "host",
+                    "args": [
+                      {
+                        "ref": "g.network"
+                      }
+                    ]
+                  },
+                  {
+                    "ref": "params.legacy_snmp_pollers"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "snmp.unrestricted",
+      "name": "Potential SNMP accepts have a source or interface restriction",
+      "description": "Potential SNMP accepts have a source or interface restriction. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {},
+      "params": {
+        "snmp_port": 161
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "op": "filter",
+            "items": {
+              "op": "filter",
+              "items": {
+                "ref": "router.firewall_v4.rules"
+              },
+              "as": "f",
+              "test": {
+                "op": "and",
+                "args": [
+                  {
+                    "ref": "f.enabled"
+                  },
+                  {
+                    "op": "eq",
+                    "args": [
+                      {
+                        "ref": "f.chain"
+                      },
+                      "input"
+                    ]
+                  }
+                ]
+              }
+            },
+            "as": "f",
+            "test": {
+              "op": "and",
+              "args": [
+                {
+                  "op": "eq",
+                  "args": [
+                    {
+                      "ref": "f.action"
+                    },
+                    "accept"
+                  ]
+                },
+                {
+                  "op": "in",
+                  "args": [
+                    {
+                      "ref": "f.protocol"
+                    },
+                    [
+                      null,
+                      "udp",
+                      "17"
+                    ]
+                  ]
+                },
+                {
+                  "op": "port_contains",
+                  "args": [
+                    {
+                      "ref": "f.destination_ports"
+                    },
+                    {
+                      "ref": "params.snmp_port"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "as": "f",
+          "test": {
+            "op": "or",
+            "args": [
+              {
+                "op": "ne",
+                "args": [
+                  {
+                    "ref": "f.ingress"
+                  },
+                  null
+                ]
+              },
+              {
+                "op": "and",
+                "args": [
+                  {
+                    "op": "ne",
+                    "args": [
+                      {
+                        "ref": "f.source_network"
+                      },
+                      null
+                    ]
+                  },
+                  {
+                    "op": "not",
+                    "args": [
+                      {
+                        "op": "in",
+                        "args": [
+                          {
+                            "ref": "f.source_network"
+                          },
+                          [
+                            "0.0.0.0/0",
+                            "!255.255.255.255/32"
+                          ]
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "and",
+                "args": [
+                  {
+                    "op": "ne",
+                    "args": [
+                      {
+                        "ref": "f.source_group"
+                      },
+                      null
+                    ]
+                  },
+                  {
+                    "op": "not",
+                    "args": [
+                      {
+                        "op": "any",
+                        "items": {
+                          "ref": "router.firewall_v4.groups"
+                        },
+                        "as": "g",
+                        "test": {
+                          "op": "and",
+                          "args": [
+                            {
+                              "ref": "g.enabled"
+                            },
+                            {
+                              "op": "eq",
+                              "args": [
+                                {
+                                  "ref": "g.name"
+                                },
+                                {
+                                  "ref": "f.source_group"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "eq",
+                              "args": [
+                                {
+                                  "ref": "g.network"
+                                },
+                                "0.0.0.0/0"
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "snmp.location",
+      "name": "Enabled SNMP has a location",
+      "description": "Enabled SNMP has a location. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P2",
+      "scope": {},
+      "params": {},
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "or",
+          "args": [
+            {
+              "op": "ne",
+              "args": [
+                {
+                  "ref": "router.snmp_enabled"
+                },
+                true
+              ]
+            },
+            {
+              "op": "and",
+              "args": [
+                {
+                  "op": "ne",
+                  "args": [
+                    {
+                      "ref": "router.snmp_location"
+                    },
+                    null
+                  ]
+                },
+                {
+                  "op": "ne",
+                  "args": [
+                    {
+                      "ref": "router.snmp_location"
+                    },
+                    ""
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "firmware.family",
+      "name": "Do not use forbidden firmware families",
+      "description": "Do not use forbidden firmware families. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {},
+      "params": {
+        "forbidden_families": [
+          "6"
+        ]
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "not",
+          "args": [
+            {
+              "op": "in",
+              "args": [
+                {
+                  "ref": "router.platform.family"
+                },
+                {
+                  "ref": "params.forbidden_families"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "firmware.exact-version",
+      "name": "Firmware version is recorded",
+      "description": "Firmware version is recorded. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P2",
+      "scope": {},
+      "params": {},
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "and",
+          "args": [
+            {
+              "op": "ne",
+              "args": [
+                {
+                  "ref": "router.platform.version"
+                },
+                null
+              ]
+            },
+            {
+              "op": "ne",
+              "args": [
+                {
+                  "ref": "router.platform.version"
+                },
+                ""
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "identity",
+      "name": "Configured identity matches inventory name",
+      "description": "Configured identity matches inventory name. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P2",
+      "scope": {},
+      "params": {},
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "or",
+          "args": [
+            {
+              "op": "eq",
+              "args": [
+                {
+                  "ref": "router.identity"
+                },
+                {
+                  "ref": "router.name"
+                }
+              ]
+            },
+            {
+              "op": "starts_with",
+              "args": [
+                {
+                  "ref": "router.identity"
+                },
+                {
+                  "op": "concat",
+                  "args": [
+                    {
+                      "ref": "router.name"
+                    },
+                    "."
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bond.mode",
+      "name": "Bonds use the intended aggregation mode",
+      "description": "Bonds use the intended aggregation mode. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {},
+      "params": {
+        "bond_mode": "802.3ad"
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "op": "filter",
+            "items": {
+              "ref": "router.interfaces"
+            },
+            "as": "i",
+            "test": {
+              "op": "eq",
+              "args": [
+                {
+                  "ref": "i.kind"
+                },
+                "bonding"
+              ]
+            }
+          },
+          "as": "i",
+          "test": {
+            "op": "eq",
+            "args": [
+              {
+                "ref": "i.mode"
+              },
+              {
+                "ref": "params.bond_mode"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "uplink.disabled",
+      "name": "Disabled production uplinks have an explicit staged or retired comment",
+      "description": "Disabled production uplinks have an explicit staged or retired comment. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P2",
+      "scope": {},
+      "params": {
+        "staged_words": [
+          "staged",
+          "spare",
+          "retired"
+        ],
+        "uplink_words": [
+          "border",
+          "bng",
+          "bond",
+          "uplink"
+        ]
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "op": "filter",
+            "items": {
+              "ref": "router.interfaces"
+            },
+            "as": "i",
+            "test": {
+              "op": "and",
+              "args": [
+                {
+                  "op": "not",
+                  "args": [
+                    {
+                      "ref": "i.enabled"
+                    }
+                  ]
+                },
+                {
+                  "op": "any",
+                  "items": {
+                    "ref": "params.uplink_words"
+                  },
+                  "as": "word",
+                  "test": {
+                    "op": "contains",
+                    "args": [
+                      {
+                        "op": "lower",
+                        "args": [
+                          {
+                            "ref": "i.name"
+                          }
+                        ]
+                      },
+                      {
+                        "ref": "word"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "as": "i",
+          "test": {
+            "op": "any",
+            "items": {
+              "ref": "params.staged_words"
+            },
+            "as": "word",
+            "test": {
+              "op": "contains",
+              "args": [
+                {
+                  "op": "lower",
+                  "args": [
+                    {
+                      "ref": "i.comment"
+                    }
+                  ]
+                },
+                {
+                  "ref": "word"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "dns",
+      "name": "Infrastructure uses the intended resolver list",
+      "description": "Infrastructure uses the intended resolver list. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P2",
+      "scope": {
+        "roles": [
+          "bng",
+          "border",
+          "edge",
+          "core"
+        ]
+      },
+      "params": {
+        "dns": [
+          "8.8.8.8",
+          "1.1.1.1"
+        ]
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "eq",
+          "args": [
+            {
+              "ref": "router.dns"
+            },
+            {
+              "ref": "params.dns"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "loopback",
+      "name": "Infrastructure has an active loopback in the allocated range",
+      "description": "Infrastructure has an active loopback in the allocated range. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "bng",
+          "border",
+          "edge",
+          "core"
+        ]
+      },
+      "params": {
+        "loopback_excluded": [
+          "193.16.0.0"
+        ],
+        "loopback_name": "loopback",
+        "loopback_prefix": "193.16.0.0/28"
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "gt",
+          "args": [
+            {
+              "op": "length",
+              "args": [
+                {
+                  "op": "filter",
+                  "items": {
+                    "ref": "router.addresses"
+                  },
+                  "as": "a",
+                  "test": {
+                    "op": "and",
+                    "args": [
+                      {
+                        "ref": "a.enabled"
+                      },
+                      {
+                        "op": "contains",
+                        "args": [
+                          {
+                            "ref": "a.interface"
+                          },
+                          {
+                            "ref": "params.loopback_name"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "eq",
+                        "args": [
+                          {
+                            "op": "prefix_length",
+                            "args": [
+                              {
+                                "ref": "a.address"
+                              }
+                            ]
+                          },
+                          32
+                        ]
+                      },
+                      {
+                        "op": "within",
+                        "args": [
+                          {
+                            "ref": "a.address"
+                          },
+                          {
+                            "ref": "params.loopback_prefix"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "not",
+                        "args": [
+                          {
+                            "op": "in",
+                            "args": [
+                              {
+                                "op": "host",
+                                "args": [
+                                  {
+                                    "ref": "a.address"
+                                  }
+                                ]
+                              },
+                              {
+                                "ref": "params.loopback_excluded"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            0
+          ]
+        }
+      }
+    },
+    {
+      "id": "bng.conntrack",
+      "name": "BNG connection tracking is disabled",
+      "description": "BNG connection tracking is disabled. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "bng"
+        ]
+      },
+      "params": {},
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "eq",
+          "args": [
+            {
+              "ref": "router.firewall_v4.connection_tracking"
+            },
+            false
+          ]
+        }
+      }
+    },
+    {
+      "id": "bng.pppoe",
+      "name": "BNG subscriber servers use intended placement and settings",
+      "description": "BNG subscriber servers use intended placement and settings. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "bng"
+        ]
+      },
+      "params": {
+        "ppp_authentication": [
+          "pap",
+          "chap"
+        ],
+        "ppp_mtu": 1500,
+        "ppp_profile": "ppp",
+        "subscriber_interface": "vlan101-ppp"
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "and",
+          "args": [
+            {
+              "op": "gt",
+              "args": [
+                {
+                  "op": "length",
+                  "args": [
+                    {
+                      "op": "filter",
+                      "items": {
+                        "ref": "router.ppp_servers"
+                      },
+                      "as": "s",
+                      "test": {
+                        "ref": "s.enabled"
+                      }
+                    }
+                  ]
+                },
+                0
+              ]
+            },
+            {
+              "op": "all",
+              "items": {
+                "op": "filter",
+                "items": {
+                  "ref": "router.ppp_servers"
+                },
+                "as": "s",
+                "test": {
+                  "ref": "s.enabled"
+                }
+              },
+              "as": "s",
+              "test": {
+                "op": "and",
+                "args": [
+                  {
+                    "op": "eq",
+                    "args": [
+                      {
+                        "ref": "s.mtu"
+                      },
+                      {
+                        "ref": "params.ppp_mtu"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "eq",
+                    "args": [
+                      {
+                        "ref": "s.interface"
+                      },
+                      {
+                        "ref": "params.subscriber_interface"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "set_equals",
+                    "args": [
+                      {
+                        "ref": "s.authentication"
+                      },
+                      {
+                        "ref": "params.ppp_authentication"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "eq",
+                    "args": [
+                      {
+                        "ref": "s.profile"
+                      },
+                      {
+                        "ref": "params.ppp_profile"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bng.ppp-source",
+      "name": "PPP local address matches the loopback",
+      "description": "PPP local address matches the loopback. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "bng"
+        ]
+      },
+      "params": {
+        "loopback_excluded": [
+          "193.16.0.0"
+        ],
+        "loopback_name": "loopback",
+        "loopback_prefix": "193.16.0.0/28",
+        "ppp_profile": "ppp"
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "and",
+          "args": [
+            {
+              "op": "in",
+              "args": [
+                {
+                  "ref": "params.ppp_profile"
+                },
+                {
+                  "ref": "router.ppp_local_addresses"
+                }
+              ]
+            },
+            {
+              "op": "eq",
+              "args": [
+                {
+                  "op": "get",
+                  "args": [
+                    {
+                      "ref": "router.ppp_local_addresses"
+                    },
+                    {
+                      "ref": "params.ppp_profile"
+                    }
+                  ]
+                },
+                {
+                  "op": "host",
+                  "args": [
+                    {
+                      "op": "get",
+                      "args": [
+                        {
+                          "op": "first",
+                          "args": [
+                            {
+                              "op": "filter",
+                              "items": {
+                                "ref": "router.addresses"
+                              },
+                              "as": "a",
+                              "test": {
+                                "op": "and",
+                                "args": [
+                                  {
+                                    "ref": "a.enabled"
+                                  },
+                                  {
+                                    "op": "contains",
+                                    "args": [
+                                      {
+                                        "ref": "a.interface"
+                                      },
+                                      {
+                                        "ref": "params.loopback_name"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "op": "eq",
+                                    "args": [
+                                      {
+                                        "op": "prefix_length",
+                                        "args": [
+                                          {
+                                            "ref": "a.address"
+                                          }
+                                        ]
+                                      },
+                                      32
+                                    ]
+                                  },
+                                  {
+                                    "op": "within",
+                                    "args": [
+                                      {
+                                        "ref": "a.address"
+                                      },
+                                      {
+                                        "ref": "params.loopback_prefix"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "op": "not",
+                                    "args": [
+                                      {
+                                        "op": "in",
+                                        "args": [
+                                          {
+                                            "op": "host",
+                                            "args": [
+                                              {
+                                                "ref": "a.address"
+                                              }
+                                            ]
+                                          },
+                                          {
+                                            "ref": "params.loopback_excluded"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        },
+                        "address"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bng.radius-count",
+      "name": "BNGs have the intended number of active RADIUS servers",
+      "description": "BNGs have the intended number of active RADIUS servers. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "bng"
+        ]
+      },
+      "params": {
+        "radius_count": 2
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "eq",
+          "args": [
+            {
+              "op": "length",
+              "args": [
+                {
+                  "op": "filter",
+                  "items": {
+                    "ref": "router.radius"
+                  },
+                  "as": "s",
+                  "test": {
+                    "ref": "s.enabled"
+                  }
+                }
+              ]
+            },
+            {
+              "ref": "params.radius_count"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bng.radius",
+      "name": "RADIUS uses the loopback and intended timeout order",
+      "description": "RADIUS uses the loopback and intended timeout order. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "bng"
+        ]
+      },
+      "params": {
+        "loopback_excluded": [
+          "193.16.0.0"
+        ],
+        "loopback_name": "loopback",
+        "loopback_prefix": "193.16.0.0/28",
+        "radius_primary_ms": 500,
+        "radius_secondary_ms": 2000
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "op": "enumerate",
+            "args": [
+              {
+                "op": "filter",
+                "items": {
+                  "ref": "router.radius"
+                },
+                "as": "s",
+                "test": {
+                  "ref": "s.enabled"
+                }
+              }
+            ]
+          },
+          "as": "entry",
+          "test": {
+            "op": "and",
+            "args": [
+              {
+                "op": "eq",
+                "args": [
+                  {
+                    "ref": "entry.item.source_address"
+                  },
+                  {
+                    "op": "host",
+                    "args": [
+                      {
+                        "op": "get",
+                        "args": [
+                          {
+                            "op": "first",
+                            "args": [
+                              {
+                                "op": "filter",
+                                "items": {
+                                  "ref": "router.addresses"
+                                },
+                                "as": "a",
+                                "test": {
+                                  "op": "and",
+                                  "args": [
+                                    {
+                                      "ref": "a.enabled"
+                                    },
+                                    {
+                                      "op": "contains",
+                                      "args": [
+                                        {
+                                          "ref": "a.interface"
+                                        },
+                                        {
+                                          "ref": "params.loopback_name"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "op": "eq",
+                                      "args": [
+                                        {
+                                          "op": "prefix_length",
+                                          "args": [
+                                            {
+                                              "ref": "a.address"
+                                            }
+                                          ]
+                                        },
+                                        32
+                                      ]
+                                    },
+                                    {
+                                      "op": "within",
+                                      "args": [
+                                        {
+                                          "ref": "a.address"
+                                        },
+                                        {
+                                          "ref": "params.loopback_prefix"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "op": "not",
+                                      "args": [
+                                        {
+                                          "op": "in",
+                                          "args": [
+                                            {
+                                              "op": "host",
+                                              "args": [
+                                                {
+                                                  "ref": "a.address"
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "ref": "params.loopback_excluded"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "address"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "eq",
+                "args": [
+                  {
+                    "ref": "entry.item.timeout_ms"
+                  },
+                  {
+                    "op": "if",
+                    "args": [
+                      {
+                        "op": "eq",
+                        "args": [
+                          {
+                            "ref": "entry.index"
+                          },
+                          0
+                        ]
+                      },
+                      {
+                        "ref": "params.radius_primary_ms"
+                      },
+                      {
+                        "ref": "params.radius_secondary_ms"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "bng.distribution",
+      "name": "BNGs have an active distribution uplink",
+      "description": "BNGs have an active distribution uplink. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "bng"
+        ]
+      },
+      "params": {
+        "distribution_words": [
+          "switch",
+          "sw-",
+          "sw1",
+          "sw2"
+        ]
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "any",
+          "items": {
+            "ref": "router.interfaces"
+          },
+          "as": "i",
+          "test": {
+            "op": "and",
+            "args": [
+              {
+                "ref": "i.enabled"
+              },
+              {
+                "op": "any",
+                "items": {
+                  "ref": "params.distribution_words"
+                },
+                "as": "word",
+                "test": {
+                  "op": "contains",
+                  "args": [
+                    {
+                      "op": "lower",
+                      "args": [
+                        {
+                          "ref": "i.name"
+                        }
+                      ]
+                    },
+                    {
+                      "ref": "word"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "bng.mesh",
+      "name": "BNGs have an active session to each intended border",
+      "description": "BNGs have an active session to each intended border. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "bng"
+        ]
+      },
+      "params": {
+        "borders": [
+          "border-X",
+          "border-Y"
+        ]
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "ref": "params.borders"
+          },
+          "as": "border",
+          "test": {
+            "op": "gt",
+            "args": [
+              {
+                "op": "length",
+                "args": [
+                  {
+                    "op": "filter",
+                    "items": {
+                      "ref": "router.bgp.peers"
+                    },
+                    "as": "p",
+                    "test": {
+                      "op": "and",
+                      "args": [
+                        {
+                          "ref": "p.enabled"
+                        },
+                        {
+                          "op": "ne",
+                          "args": [
+                            {
+                              "ref": "p.remote_address"
+                            },
+                            null
+                          ]
+                        },
+                        {
+                          "op": "in",
+                          "args": [
+                            {
+                              "op": "host",
+                              "args": [
+                                {
+                                  "ref": "p.remote_address"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "map",
+                              "items": {
+                                "op": "filter",
+                                "items": {
+                                  "op": "get",
+                                  "args": [
+                                    {
+                                      "op": "get",
+                                      "args": [
+                                        {
+                                          "ref": "routers"
+                                        },
+                                        {
+                                          "ref": "border"
+                                        }
+                                      ]
+                                    },
+                                    "addresses"
+                                  ]
+                                },
+                                "as": "a",
+                                "test": {
+                                  "ref": "a.enabled"
+                                }
+                              },
+                              "as": "a",
+                              "test": {
+                                "op": "host",
+                                "args": [
+                                  {
+                                    "ref": "a.address"
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "bng.redistribute",
+      "name": "BNG border peerings redistribute the intended route classes",
+      "description": "BNG border peerings redistribute the intended route classes. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "bng"
+        ]
+      },
+      "params": {
+        "borders": [
+          "border-X",
+          "border-Y"
+        ],
+        "redistribute": [
+          "connected",
+          "vpn"
+        ]
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "ref": "params.borders"
+          },
+          "as": "border",
+          "test": {
+            "op": "all",
+            "items": {
+              "op": "filter",
+              "items": {
+                "ref": "router.bgp.peers"
+              },
+              "as": "p",
+              "test": {
+                "op": "and",
+                "args": [
+                  {
+                    "ref": "p.enabled"
+                  },
+                  {
+                    "op": "ne",
+                    "args": [
+                      {
+                        "ref": "p.remote_address"
+                      },
+                      null
+                    ]
+                  },
+                  {
+                    "op": "in",
+                    "args": [
+                      {
+                        "op": "host",
+                        "args": [
+                          {
+                            "ref": "p.remote_address"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "map",
+                        "items": {
+                          "op": "filter",
+                          "items": {
+                            "op": "get",
+                            "args": [
+                              {
+                                "op": "get",
+                                "args": [
+                                  {
+                                    "ref": "routers"
+                                  },
+                                  {
+                                    "ref": "border"
+                                  }
+                                ]
+                              },
+                              "addresses"
+                            ]
+                          },
+                          "as": "a",
+                          "test": {
+                            "ref": "a.enabled"
+                          }
+                        },
+                        "as": "a",
+                        "test": {
+                          "op": "host",
+                          "args": [
+                            {
+                              "ref": "a.address"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "as": "p",
+            "test": {
+              "op": "set_equals",
+              "args": [
+                {
+                  "ref": "p.redistribute"
+                },
+                {
+                  "ref": "params.redistribute"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "bng.mesh-local-address",
+      "name": "BGP local endpoints are configured and enabled",
+      "description": "BGP local endpoints are configured and enabled. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "bng"
+        ]
+      },
+      "params": {
+        "borders": [
+          "border-X",
+          "border-Y"
+        ]
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "ref": "params.borders"
+          },
+          "as": "border",
+          "test": {
+            "op": "all",
+            "items": {
+              "op": "filter",
+              "items": {
+                "ref": "router.bgp.peers"
+              },
+              "as": "p",
+              "test": {
+                "op": "and",
+                "args": [
+                  {
+                    "ref": "p.enabled"
+                  },
+                  {
+                    "op": "ne",
+                    "args": [
+                      {
+                        "ref": "p.remote_address"
+                      },
+                      null
+                    ]
+                  },
+                  {
+                    "op": "in",
+                    "args": [
+                      {
+                        "op": "host",
+                        "args": [
+                          {
+                            "ref": "p.remote_address"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "map",
+                        "items": {
+                          "op": "filter",
+                          "items": {
+                            "op": "get",
+                            "args": [
+                              {
+                                "op": "get",
+                                "args": [
+                                  {
+                                    "ref": "routers"
+                                  },
+                                  {
+                                    "ref": "border"
+                                  }
+                                ]
+                              },
+                              "addresses"
+                            ]
+                          },
+                          "as": "a",
+                          "test": {
+                            "ref": "a.enabled"
+                          }
+                        },
+                        "as": "a",
+                        "test": {
+                          "op": "host",
+                          "args": [
+                            {
+                              "ref": "a.address"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "as": "p",
+            "test": {
+              "op": "in",
+              "args": [
+                {
+                  "ref": "p.local_address"
+                },
+                {
+                  "op": "map",
+                  "items": {
+                    "op": "filter",
+                    "items": {
+                      "op": "get",
+                      "args": [
+                        {
+                          "ref": "router"
+                        },
+                        "addresses"
+                      ]
+                    },
+                    "as": "a",
+                    "test": {
+                      "ref": "a.enabled"
+                    }
+                  },
+                  "as": "a",
+                  "test": {
+                    "op": "host",
+                    "args": [
+                      {
+                        "ref": "a.address"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "bng.mesh-reciprocal",
+      "name": "Border sessions have matching enabled reverse endpoints",
+      "description": "Border sessions have matching enabled reverse endpoints. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "bng"
+        ]
+      },
+      "params": {
+        "borders": [
+          "border-X",
+          "border-Y"
+        ]
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "ref": "params.borders"
+          },
+          "as": "border",
+          "test": {
+            "op": "all",
+            "items": {
+              "op": "filter",
+              "items": {
+                "ref": "router.bgp.peers"
+              },
+              "as": "p",
+              "test": {
+                "op": "and",
+                "args": [
+                  {
+                    "ref": "p.enabled"
+                  },
+                  {
+                    "op": "ne",
+                    "args": [
+                      {
+                        "ref": "p.remote_address"
+                      },
+                      null
+                    ]
+                  },
+                  {
+                    "op": "in",
+                    "args": [
+                      {
+                        "op": "host",
+                        "args": [
+                          {
+                            "ref": "p.remote_address"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "map",
+                        "items": {
+                          "op": "filter",
+                          "items": {
+                            "op": "get",
+                            "args": [
+                              {
+                                "op": "get",
+                                "args": [
+                                  {
+                                    "ref": "routers"
+                                  },
+                                  {
+                                    "ref": "border"
+                                  }
+                                ]
+                              },
+                              "addresses"
+                            ]
+                          },
+                          "as": "a",
+                          "test": {
+                            "ref": "a.enabled"
+                          }
+                        },
+                        "as": "a",
+                        "test": {
+                          "op": "host",
+                          "args": [
+                            {
+                              "ref": "a.address"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "as": "p",
+            "test": {
+              "op": "gt",
+              "args": [
+                {
+                  "op": "length",
+                  "args": [
+                    {
+                      "op": "filter",
+                      "items": {
+                        "op": "get",
+                        "args": [
+                          {
+                            "op": "get",
+                            "args": [
+                              {
+                                "op": "get",
+                                "args": [
+                                  {
+                                    "ref": "routers"
+                                  },
+                                  {
+                                    "ref": "border"
+                                  }
+                                ]
+                              },
+                              "bgp"
+                            ]
+                          },
+                          "peers"
+                        ]
+                      },
+                      "as": "q",
+                      "test": {
+                        "op": "and",
+                        "args": [
+                          {
+                            "ref": "q.enabled"
+                          },
+                          {
+                            "op": "ne",
+                            "args": [
+                              {
+                                "ref": "q.remote_address"
+                              },
+                              null
+                            ]
+                          },
+                          {
+                            "op": "eq",
+                            "args": [
+                              {
+                                "op": "host",
+                                "args": [
+                                  {
+                                    "ref": "q.remote_address"
+                                  }
+                                ]
+                              },
+                              {
+                                "ref": "p.local_address"
+                              }
+                            ]
+                          },
+                          {
+                            "op": "eq",
+                            "args": [
+                              {
+                                "ref": "q.local_address"
+                              },
+                              {
+                                "op": "host",
+                                "args": [
+                                  {
+                                    "ref": "p.remote_address"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                0
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "bng.mesh-transit",
+      "name": "Each intended border has an active addressed transit",
+      "description": "Each intended border has an active addressed transit. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "bng"
+        ]
+      },
+      "params": {
+        "borders": [
+          "border-X",
+          "border-Y"
+        ]
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "ref": "params.borders"
+          },
+          "as": "border",
+          "test": {
+            "op": "gt",
+            "args": [
+              {
+                "op": "length",
+                "args": [
+                  {
+                    "op": "filter",
+                    "items": {
+                      "ref": "router.addresses"
+                    },
+                    "as": "a",
+                    "test": {
+                      "op": "and",
+                      "args": [
+                        {
+                          "ref": "a.enabled"
+                        },
+                        {
+                          "op": "contains",
+                          "args": [
+                            {
+                              "op": "lower",
+                              "args": [
+                                {
+                                  "ref": "a.interface"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "lower",
+                              "args": [
+                                {
+                                  "ref": "border"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "bng.mesh-ospf",
+      "name": "Border transits have active OSPF templates",
+      "description": "Border transits have active OSPF templates. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "bng"
+        ]
+      },
+      "params": {
+        "borders": [
+          "border-X",
+          "border-Y"
+        ]
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "ref": "params.borders"
+          },
+          "as": "border",
+          "test": {
+            "op": "all",
+            "items": {
+              "op": "filter",
+              "items": {
+                "ref": "router.addresses"
+              },
+              "as": "a",
+              "test": {
+                "op": "and",
+                "args": [
+                  {
+                    "ref": "a.enabled"
+                  },
+                  {
+                    "op": "contains",
+                    "args": [
+                      {
+                        "op": "lower",
+                        "args": [
+                          {
+                            "ref": "a.interface"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "lower",
+                        "args": [
+                          {
+                            "ref": "border"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "as": "a",
+            "test": {
+              "op": "in",
+              "args": [
+                {
+                  "ref": "a.interface"
+                },
+                {
+                  "ref": "router.ospf_interfaces"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "bng.mesh-ospf-firewall",
+      "name": "Border transits have explicit OSPF input allows",
+      "description": "Border transits have explicit OSPF input allows. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "bng"
+        ]
+      },
+      "params": {
+        "borders": [
+          "border-X",
+          "border-Y"
+        ]
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "ref": "params.borders"
+          },
+          "as": "border",
+          "test": {
+            "op": "all",
+            "items": {
+              "op": "filter",
+              "items": {
+                "ref": "router.addresses"
+              },
+              "as": "a",
+              "test": {
+                "op": "and",
+                "args": [
+                  {
+                    "ref": "a.enabled"
+                  },
+                  {
+                    "op": "contains",
+                    "args": [
+                      {
+                        "op": "lower",
+                        "args": [
+                          {
+                            "ref": "a.interface"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "lower",
+                        "args": [
+                          {
+                            "ref": "border"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "as": "a",
+            "test": {
+              "op": "any",
+              "items": {
+                "ref": "router.firewall_v4.rules"
+              },
+              "as": "f",
+              "test": {
+                "op": "and",
+                "args": [
+                  {
+                    "ref": "f.enabled"
+                  },
+                  {
+                    "op": "eq",
+                    "args": [
+                      {
+                        "ref": "f.chain"
+                      },
+                      "input"
+                    ]
+                  },
+                  {
+                    "op": "eq",
+                    "args": [
+                      {
+                        "ref": "f.action"
+                      },
+                      "accept"
+                    ]
+                  },
+                  {
+                    "op": "in",
+                    "args": [
+                      {
+                        "ref": "f.protocol"
+                      },
+                      [
+                        "ospf",
+                        "89"
+                      ]
+                    ]
+                  },
+                  {
+                    "op": "eq",
+                    "args": [
+                      {
+                        "ref": "f.ingress"
+                      },
+                      {
+                        "ref": "a.interface"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "bng.customer-export",
+      "name": "BNG exports allow the intended customer more-specifics",
+      "description": "BNG exports allow the intended customer more-specifics. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "bng"
+        ]
+      },
+      "params": {
+        "borders": [
+          "border-X",
+          "border-Y"
+        ],
+        "customer_max_length": 32,
+        "customer_min_length": 25,
+        "public_prefixes": [
+          "193.9.15.0/24",
+          "193.9.29.0/24",
+          "193.9.255.0/24",
+          "195.10.209.0/24",
+          "195.10.215.0/24",
+          "195.10.222.0/24"
+        ]
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "ref": "params.borders"
+          },
+          "as": "border",
+          "test": {
+            "op": "all",
+            "items": {
+              "op": "filter",
+              "items": {
+                "ref": "router.bgp.peers"
+              },
+              "as": "p",
+              "test": {
+                "op": "and",
+                "args": [
+                  {
+                    "ref": "p.enabled"
+                  },
+                  {
+                    "op": "ne",
+                    "args": [
+                      {
+                        "ref": "p.remote_address"
+                      },
+                      null
+                    ]
+                  },
+                  {
+                    "op": "in",
+                    "args": [
+                      {
+                        "op": "host",
+                        "args": [
+                          {
+                            "ref": "p.remote_address"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "map",
+                        "items": {
+                          "op": "filter",
+                          "items": {
+                            "op": "get",
+                            "args": [
+                              {
+                                "op": "get",
+                                "args": [
+                                  {
+                                    "ref": "routers"
+                                  },
+                                  {
+                                    "ref": "border"
+                                  }
+                                ]
+                              },
+                              "addresses"
+                            ]
+                          },
+                          "as": "a",
+                          "test": {
+                            "ref": "a.enabled"
+                          }
+                        },
+                        "as": "a",
+                        "test": {
+                          "op": "host",
+                          "args": [
+                            {
+                              "ref": "a.address"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "as": "p",
+            "test": {
+              "op": "all",
+              "items": {
+                "ref": "params.public_prefixes"
+              },
+              "as": "prefix",
+              "test": {
+                "op": "route_range",
+                "args": [
+                  {
+                    "ref": "router"
+                  },
+                  {
+                    "ref": "p.export_policy"
+                  },
+                  {
+                    "ref": "prefix"
+                  },
+                  {
+                    "ref": "params.customer_min_length"
+                  },
+                  {
+                    "ref": "params.customer_max_length"
+                  },
+                  "accept"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "border.customer-import",
+      "name": "Borders accept intended customer more-specifics from BNGs",
+      "description": "Borders accept intended customer more-specifics from BNGs. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "border"
+        ]
+      },
+      "params": {
+        "bng_role": "bng",
+        "customer_max_length": 32,
+        "customer_min_length": 25,
+        "public_prefixes": [
+          "193.9.15.0/24",
+          "193.9.29.0/24",
+          "193.9.255.0/24",
+          "195.10.209.0/24",
+          "195.10.215.0/24",
+          "195.10.222.0/24"
+        ]
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "op": "filter",
+            "items": {
+              "ref": "router.bgp.peers"
+            },
+            "as": "p",
+            "test": {
+              "op": "and",
+              "args": [
+                {
+                  "ref": "p.enabled"
+                },
+                {
+                  "op": "ne",
+                  "args": [
+                    {
+                      "ref": "p.remote_address"
+                    },
+                    null
+                  ]
+                },
+                {
+                  "op": "any",
+                  "items": {
+                    "op": "filter",
+                    "items": {
+                      "op": "values",
+                      "args": [
+                        {
+                          "ref": "routers"
+                        }
+                      ]
+                    },
+                    "as": "node",
+                    "test": {
+                      "op": "eq",
+                      "args": [
+                        {
+                          "ref": "node.role"
+                        },
+                        {
+                          "ref": "params.bng_role"
+                        }
+                      ]
+                    }
+                  },
+                  "as": "node",
+                  "test": {
+                    "op": "in",
+                    "args": [
+                      {
+                        "op": "host",
+                        "args": [
+                          {
+                            "ref": "p.remote_address"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "map",
+                        "items": {
+                          "op": "filter",
+                          "items": {
+                            "op": "get",
+                            "args": [
+                              {
+                                "ref": "node"
+                              },
+                              "addresses"
+                            ]
+                          },
+                          "as": "a",
+                          "test": {
+                            "ref": "a.enabled"
+                          }
+                        },
+                        "as": "a",
+                        "test": {
+                          "op": "host",
+                          "args": [
+                            {
+                              "ref": "a.address"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "as": "p",
+          "test": {
+            "op": "all",
+            "items": {
+              "ref": "params.public_prefixes"
+            },
+            "as": "prefix",
+            "test": {
+              "op": "route_range",
+              "args": [
+                {
+                  "ref": "router"
+                },
+                {
+                  "ref": "p.import_policy"
+                },
+                {
+                  "ref": "prefix"
+                },
+                {
+                  "ref": "params.customer_min_length"
+                },
+                {
+                  "ref": "params.customer_max_length"
+                },
+                "accept"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "border.default-only",
+      "name": "Border output toward BNGs is default-only",
+      "description": "Border output toward BNGs is default-only. All intent and values are editable in this definition.",
+      "suite": "brighton-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {
+        "roles": [
+          "border"
+        ]
+      },
+      "params": {
+        "bng_role": "bng"
+      },
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "all",
+          "items": {
+            "op": "filter",
+            "items": {
+              "ref": "router.bgp.peers"
+            },
+            "as": "p",
+            "test": {
+              "op": "and",
+              "args": [
+                {
+                  "ref": "p.enabled"
+                },
+                {
+                  "op": "ne",
+                  "args": [
+                    {
+                      "ref": "p.remote_address"
+                    },
+                    null
+                  ]
+                },
+                {
+                  "op": "any",
+                  "items": {
+                    "op": "filter",
+                    "items": {
+                      "op": "values",
+                      "args": [
+                        {
+                          "ref": "routers"
+                        }
+                      ]
+                    },
+                    "as": "node",
+                    "test": {
+                      "op": "eq",
+                      "args": [
+                        {
+                          "ref": "node.role"
+                        },
+                        {
+                          "ref": "params.bng_role"
+                        }
+                      ]
+                    }
+                  },
+                  "as": "node",
+                  "test": {
+                    "op": "in",
+                    "args": [
+                      {
+                        "op": "host",
+                        "args": [
+                          {
+                            "ref": "p.remote_address"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "map",
+                        "items": {
+                          "op": "filter",
+                          "items": {
+                            "op": "get",
+                            "args": [
+                              {
+                                "ref": "node"
+                              },
+                              "addresses"
+                            ]
+                          },
+                          "as": "a",
+                          "test": {
+                            "ref": "a.enabled"
+                          }
+                        },
+                        "as": "a",
+                        "test": {
+                          "op": "host",
+                          "args": [
+                            {
+                              "ref": "a.address"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "as": "p",
+          "test": {
+            "op": "eq",
+            "args": [
+              {
+                "op": "default_only",
+                "args": [
+                  {
+                    "ref": "router"
+                  },
+                  {
+                    "ref": "p.export_policy"
+                  }
+                ]
+              },
+              true
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

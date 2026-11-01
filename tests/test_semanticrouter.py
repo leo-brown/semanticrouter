@@ -9,7 +9,8 @@ from semanticrouter import RouterOSRouter, UnsupportedExport, export_router, loa
 from semanticrouter.adapters.routeros import parse
 from semanticrouter.cli import main
 from semanticrouter.model import AddressGroup, FirewallRule, Interface, Router
-from semanticrouter.policy import audit, default_only, input_decision, route_decision
+from semanticrouter.policy import audit_brighton as audit
+from semanticrouter.policy import default_only, input_decision, route_decision
 
 
 def model(text, version=None, name="bng-X1"):

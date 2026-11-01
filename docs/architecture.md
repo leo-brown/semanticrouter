@@ -16,7 +16,7 @@ module connects to devices or evaluates configuration text as executable code.
 | `semanticrouter/adapters/routeros/router.py`   | Feature assembly and inspection-level addresses/interfaces/services                   |
 | `semanticrouter/adapters/routeros/coverage.py` | Command/property coverage independent of inspection success                           |
 | `semanticrouter/evaluation.py`                 | Pure, ordered firewall and route evaluation                                           |
-| `semanticrouter/policy.py`                     | Brighton estate assertions over common objects                                        |
+| `semanticrouter/policy.py`                     | Generic explicit-suite auditing; named compatibility helper                           |
 | `semanticrouter/renderers/`                    | Target-specific RouterOS and IOS syntax                                               |
 | `semanticrouter/export.py`                     | Target dispatch and shared completeness enforcement                                   |
 | `semanticrouter/serialization.py`              | Strict hydration of JSON into declared dataclass types                                |
@@ -42,10 +42,10 @@ misspelled fields and coerces no values.
 
 BGP precedence is instance → inherited parent templates → child template → peer.
 Missing/cyclic templates remain diagnostic. Firmware syntax family is separate from an
-exact version; conflicting evidence is rejected. The platform object exposes only vendor,
-OS, version, family and hardware; parser marker lists are not part of the model. Legacy
-workspace `platform.evidence` fields are ignored when restoring. `hardware.json` is a reference registry
-for extension, not a firmware-version inference table.
+exact version; conflicting evidence is rejected. The platform object exposes only
+vendor, OS, version, family and hardware; parser marker lists are not part of the model.
+Legacy workspace `platform.evidence` fields are ignored when restoring. `hardware.json`
+is a reference registry for extension, not a firmware-version inference table.
 
 ## Browser lifecycle
 
@@ -81,6 +81,10 @@ graph nor an enabled flag proves operational state.
    meaning, rather than the presence of a string in an export.
 6. Document the supported subset and any source/target default differences.
 
-A new estate can call the evaluator directly or implement an independent preset using
-common objects. The existing Brighton preset intentionally retains local addressing, DNS
-and role conventions; it is not a universal network standard.
+Rule intent lives in editable JSON, not Python conditionals. `expressions.py` interprets
+bounded data-only predicates over common objects; `suites.py` validates portable files.
+`policy.audit(routers, rules, variables)` runs only supplied rules and defaults to none.
+The optional `semanticrouter/suites/brighton.json` contains all local addressing, DNS,
+role conventions and complete assertion trees. `audit_brighton()` and CLI `--policy` are
+explicitly named compatibility paths to that same editable example; the browser never
+invokes them. Generic CLI audits use `--rules`.

@@ -2,14 +2,14 @@
 
 import json
 from dataclasses import asdict
-from ipaddress import ip_address, ip_network
 
 from semanticrouter.adapters.routeros import RouterOSRouter
+from semanticrouter.evaluation import input_decision, route_decision
 from semanticrouter.export import export_router
 from semanticrouter.model import Diagnostic
-from semanticrouter.policy import audit, input_decision, route_decision
 from semanticrouter.rules import run_rules, validate_rules
 from semanticrouter.serialization import router_from_dict
+from semanticrouter.suites import validate_suite
 
 
 def handle(request_json):
@@ -22,6 +22,8 @@ def handle(request_json):
     try:
         request = json.loads(request_json)
         action = request["action"]
+        if action == "suite_validate":
+            return json.dumps({"ok": True, "suite": validate_suite(request["suite"])})
         if action == "rules_validate":
             return json.dumps(
                 {"ok": True, "rules": validate_rules(request.get("rules", []))}
@@ -43,41 +45,13 @@ def handle(request_json):
             return json.dumps({"ok": True, "router": router.to_dict()})
         routers = [router_from_dict(value) for value in request["routers"]]
         if action == "audit":
-            policy = request["policy"]
-            allowed = {
-                "devices",
-                "snmp_pollers",
-                "legacy_snmp_pollers",
-                "borders",
-                "public_prefixes",
-            }
-            if not isinstance(policy, dict) or set(policy) - allowed:
-                raise ValueError(
-                    "Policy must be an object containing only supported policy fields"
-                )
-            for key, values in policy.items():
-                if not isinstance(values, list) or any(
-                    not isinstance(value, str) for value in values
-                ):
-                    raise ValueError("Policy " + key + " must be an array of strings")
-                if key in ("snmp_pollers", "legacy_snmp_pollers"):
-                    if any(ip_address(value).version != 4 for value in values):
-                        raise ValueError("SNMP pollers must be IPv4 addresses")
-                if key == "public_prefixes":
-                    if any(
-                        ip_network(value).version != 4
-                        or ip_network(value).prefixlen != 24
-                        for value in values
-                    ):
-                        raise ValueError(
-                            "Customer-prefix proof currently supports IPv4 /24 aggregates"
-                        )
-            findings = (
-                [asdict(f) for f in audit(routers, policy)]
-                if request.get("include_estate", True)
-                else []
-            )
-            results = run_rules(routers, request.get("rules", []))
+            variables = request.get("policy", {})
+            if not isinstance(variables, dict):
+                raise ValueError("Suite variables must be a JSON object")
+            # Every executed check is a visible, saved rule. Legacy include_estate
+            # flags cannot silently enable a second policy path.
+            findings = []
+            results = run_rules(routers, request.get("rules", []), variables)
             for result in results:
                 if result.status in ("fail", "unknown"):
                     findings.append(

@@ -12,10 +12,9 @@ const drafts = new Map(),
   sourceDrafts = new Map(),
   modelDrafts = new Map();
 let selectedRule = null,
-  stage = 'source',
+  stage = 'rules',
   overview = false,
   builderDirty = false;
-const metadata = (f) => f.check === 'firmware.exact-version';
 const savedRule = () =>
   state.rules.find((rule) => rule.id === selectedRule) || newRules.get(selectedRule);
 const definition = () =>
@@ -42,23 +41,20 @@ function template(kind) {
       port: 161,
       decision: 'accept',
     },
-    field: {
-      type: 'field',
-      path: 'firewall_v4.connection_tracking',
-      operator: 'equals',
-      value: false,
+    field: { type: 'field', path: 'identity', operator: 'exists' },
+    expression: {
+      type: 'expression',
+      test: { op: 'eq', args: [{ ref: 'router.identity' }, { ref: 'router.name' }] },
     },
     peers: {
       type: 'peers',
-      targets: state.policy.borders?.length
-        ? [...state.policy.borders]
-        : ['border-X', 'border-Y'],
+      targets: state.policy.borders?.length ? [...state.policy.borders] : [],
       reciprocal: true,
     },
     route: {
       type: 'route',
       chain: current()?.bgp.peers.find((p) => p.export_policy)?.export_policy || 'OUT',
-      prefix: '195.10.222.1/32',
+      prefix: '203.0.113.1/32',
       decision: 'accept',
     },
   };
@@ -119,7 +115,7 @@ export function initializeWorkbench(data, callbacks) {
   state.sourceRedacted = Object.fromEntries(
     Object.keys(state.sources).map((name) => [name, !!data.sources_redacted]),
   );
-  state.includeEstate = true;
+  state.ruleSuites = clone(data.rule_suites || []);
   try {
     const retained = JSON.parse(
       localStorage.getItem('semanticrouter-rule-files-v1') || 'null',
@@ -132,7 +128,9 @@ export function initializeWorkbench(data, callbacks) {
           typeof rule.id === 'string' &&
           typeof rule.name === 'string' &&
           rule.assert &&
-          ['packet', 'field', 'peers', 'route'].includes(rule.assert.type),
+          ['packet', 'field', 'peers', 'route', 'expression'].includes(
+            rule.assert.type,
+          ),
       )
     )
       state.rules = retained;
@@ -150,6 +148,43 @@ export function initializeWorkbench(data, callbacks) {
     renderWorkbench();
   };
   $('#new-rule').onclick = () => newRule($('#new-rule-kind').value);
+  $('#suite-example').innerHTML =
+    '<option value="">Choose an optional starting point…</option>' +
+    state.ruleSuites
+      .map(
+        (suite, index) =>
+          `<option value="${index}">${esc(suite.name)} (${suite.rules.length} rules)</option>`,
+      )
+      .join('');
+  $('#add-example').onclick = async () => {
+    const selected = $('#suite-example').value;
+    if (selected === '') return notify('Choose an example suite first.');
+    try {
+      await addSuite(state.ruleSuites[Number(selected)]);
+    } catch (error) {
+      notify(error.message, true);
+    }
+  };
+  $('#import-suite').onclick = () => $('#suite-input').click();
+  $('#suite-input').onchange = async (event) => {
+    try {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (file.size > 1024 * 1024) throw new Error('Use a suite smaller than 1 MB.');
+      await addSuite(JSON.parse(await file.text()));
+    } catch (error) {
+      notify('Suite was not added: ' + error.message, true);
+    } finally {
+      event.target.value = '';
+    }
+  };
+  $('#download-suite').onclick = () =>
+    download('semanticrouter-tests.json', {
+      id: 'workspace',
+      name: 'Workspace tests',
+      rules: state.rules,
+      variables: state.policy,
+    });
   $('#open-workspace').onclick = () => $('#workspace-input').click();
   $('#workspace-input').onchange = async (event) => {
     try {
@@ -199,6 +234,30 @@ export function initializeWorkbench(data, callbacks) {
   renderWorkbench();
 }
 
+/** Merge an explicitly selected suite without overwriting existing authored definitions. */
+async function addSuite(value) {
+  const revision = state.revision;
+  const { suite } = await callEngine('suite_validate', { suite: value });
+  const existing = new Set(state.rules.map((rule) => rule.id));
+  const additions = suite.rules.filter((rule) => !existing.has(rule.id));
+  const rules = [...state.rules, ...clone(additions)];
+  await callEngine('rules_validate', { rules });
+  if (state.revision !== revision)
+    throw new Error('The rule list changed while importing. Please try again.');
+  state.rules = rules;
+  state.policy = { ...clone(suite.variables || {}), ...state.policy };
+  selectedRule = additions[0]?.id || state.rules[0]?.id;
+  stage = 'rules';
+  overview = false;
+  state.revision++;
+  persistRules();
+  hooks.render();
+  await hooks.runChecks(false);
+  notify(
+    `${additions.length} rules added. Existing definitions were kept. Every active rule is editable.`,
+  );
+}
+
 /** Navigate problems back to the authored rule or to the cited source line. */
 export function openEvidence(finding) {
   if (finding.device) state.selected = finding.device;
@@ -234,10 +293,10 @@ export function renderWorkbench() {
     $('#' + id).setAttribute('aria-pressed', String(active));
   }
   $('#config-workbench').hidden = overview;
-  $('#ide-flow').innerHTML = ['source', 'model', 'rules', 'tests', 'export']
+  $('#ide-flow').innerHTML = ['rules', 'source', 'model', 'tests', 'export']
     .map(
       (name, index) =>
-        `<button class="${stage === name ? 'active' : ''}" data-stage="${name}"><span>${index + 1}</span>${{ source: 'Source config', model: 'Semantic model', rules: 'Author rules', tests: 'Run & inspect', export: 'Export preview' }[name]}</button>`,
+        `<button class="${stage === name ? 'active' : ''}" data-stage="${name}"><span>${index + 1}</span>${{ source: 'Source config', model: 'Semantic model', rules: 'Test design', tests: 'Run & inspect', export: 'Export preview' }[name]}</button>`,
     )
     .join('<i>→</i>');
   $('#ide-flow')
@@ -251,6 +310,8 @@ export function renderWorkbench() {
         }),
     );
   const all = [...state.rules, ...newRules.values()];
+  $('#rule-file-count').textContent =
+    `${state.rules.length} saved${newRules.size ? ' · ' + newRules.size + ' drafts' : ''}`;
   $('#rule-files').innerHTML =
     all
       .map((rule) => {
@@ -261,10 +322,10 @@ export function renderWorkbench() {
           newRules.has(rule.id) ||
           (drafts.has(rule.id) &&
             drafts.get(rule.id) !== JSON.stringify(rule, null, 2));
-        return `<button class="rule-file ${rule.id === selectedRule && stage === 'rules' ? 'selected' : ''}" data-rule-file="${esc(rule.id)}"><span>◇ ${esc(rule.id)}.json${dirty ? ' •' : ''}</span><small>${count.fail ? count.fail + ' fail' : count.unknown ? count.unknown + ' unknown' : count.pass ? count.pass + ' pass' : 'Not run'}</small></button>`;
+        return `<article class="rule-entry"><button class="rule-file ${rule.id === selectedRule && stage === 'rules' ? 'selected' : ''}" data-rule-file="${esc(rule.id)}"><span>${esc(rule.name)}${dirty ? ' •' : ''}</span><code>${esc(rule.id)}</code><small>${count.fail ? count.fail + ' fail' : count.unknown ? count.unknown + ' unknown' : count.pass ? count.pass + ' pass' : 'Not run'}</small></button><label class="rule-run"><input type="checkbox" data-enable-rule="${esc(rule.id)}" ${rule.enabled !== false ? 'checked' : ''} ${newRules.has(rule.id) ? 'disabled' : ''} aria-label="Run ${esc(rule.name)}">Run</label></article>`;
       })
       .join('') ||
-    '<p class="helper">Create a rule to define the network behaviour you expect.</p>';
+    '<div class="test-empty"><strong>No tests selected yet</strong><p>Create your first assertion or add an optional example suite. A configuration without tests has not been validated.</p></div>';
   $('#rule-files')
     .querySelectorAll('[data-rule-file]')
     .forEach(
@@ -276,6 +337,36 @@ export function renderWorkbench() {
           renderWorkbench();
         }),
     );
+  $('#rule-files')
+    .querySelectorAll('[data-enable-rule]')
+    .forEach((input) => {
+      input.onchange = async () => {
+        const revision = state.revision;
+        const previous = state.rules.find(
+          (rule) => rule.id === input.dataset.enableRule,
+        );
+        const rules = state.rules.map((rule) =>
+          rule.id === input.dataset.enableRule
+            ? { ...rule, enabled: input.checked }
+            : rule,
+        );
+        try {
+          await callEngine('rules_validate', { rules });
+          if (state.revision !== revision)
+            throw new Error('The rule list changed. Please try again.');
+          if (drafts.get(previous.id) === JSON.stringify(previous, null, 2))
+            drafts.delete(previous.id);
+          state.rules = rules;
+          state.revision++;
+          persistRules();
+          renderWorkbench();
+          await hooks.runChecks(false);
+        } catch (error) {
+          input.checked = !input.checked;
+          notify(error.message, true);
+        }
+      };
+    });
   $('#ide-filepath').textContent =
     stage === 'rules'
       ? selectedRule
@@ -306,7 +397,8 @@ export function renderWorkbench() {
     else if (stage === 'tests') return hooks.runChecks();
     else $('#ide-export-form')?.requestSubmit();
   };
-  $('#ide-primary').disabled = !state.engineReady;
+  $('#ide-primary').disabled =
+    !state.engineReady || (stage === 'rules' && !savedRule());
   $('#ide-primary').textContent = {
     source: 'Parse → model',
     model: 'Apply → run tests',
@@ -426,7 +518,7 @@ function options(values, selected) {
 function renderRule(content) {
   if (!selectedRule || !savedRule()) {
     content.innerHTML =
-      '<div class="empty-state"><h2>Define the network you expect</h2><p>Create a rule from the explorer. Start with “Monitoring packet” to test SNMP access across all nodes.</p></div>';
+      '<div class="empty-state"><h2>Define the network you expect</h2><p>Create a test or choose an optional example suite above. Define the expected behaviour before changing configuration.</p></div>';
     return;
   }
   let rule;
@@ -435,67 +527,59 @@ function renderRule(content) {
     if (
       !rule ||
       !rule.assert ||
-      !['packet', 'field', 'peers', 'route'].includes(rule.assert.type)
+      !['packet', 'field', 'peers', 'route', 'expression'].includes(rule.assert.type)
     )
       rule = savedRule();
   } catch {
     rule = savedRule();
   }
   const a = rule.assert,
-    roles = rule.scope?.roles || [];
+    roles = Array.isArray(rule.scope?.roles) ? rule.scope.roles : [];
   builderDirty = false;
-  const scoped = roles.length === 1 ? roles[0] : '';
   const assertion =
-    a.type === 'field'
-      ? `${input('Model path', 'rule-path', a.path, 'Use [] to check every item, e.g. ppp_servers[].mtu')}<label class="field">Expectation<select id="rule-operator">${options(
-          [
-            ['equals', 'equals'],
-            ['contains', 'contains item'],
-            ['includes_all', 'includes all items'],
-            ['exists', 'is explicitly present'],
-            ['count_at_least', 'has at least N items'],
-          ],
-          a.operator,
-        )}</select></label>${input('Expected JSON value', 'rule-value', JSON.stringify(a.value ?? null), 'Examples: false, 1500, ["connected", "vpn"]')}`
-      : a.type === 'packet'
-        ? `${input('Source IPv4', 'rule-source', a.source)}<div class="field-row"><label class="field">Protocol<select id="rule-protocol">${options(
-            ['udp', 'tcp', 'icmp', 'ospf'].map((x) => [x, x]),
-            a.protocol,
-          )}</select></label>${input('Destination port', 'rule-port', a.port)}</div><label class="field">Must be<select id="rule-decision">${options(
+    a.type === 'expression'
+      ? `<label class="field">Logic (JSON expression)<textarea id="rule-expression" class="rule-logic" spellcheck="false">${esc(JSON.stringify(a.test, null, 2))}</textarea></label><p class="helper">Combine references, comparisons and all/any collection assertions. No Python code or network operations are executed.</p>`
+      : a.type === 'field'
+        ? `${input('Model path', 'rule-path', a.path, 'Use [] to check every item, e.g. ppp_servers[].mtu')}<label class="field">Expectation<select id="rule-operator">${options(
             [
-              ['accept', 'accepted'],
-              ['drop', 'dropped'],
+              ['equals', 'equals'],
+              ['contains', 'contains item'],
+              ['includes_all', 'includes all items'],
+              ['exists', 'is explicitly present'],
+              ['count_at_least', 'has at least N items'],
             ],
-            a.decision,
-          )}</select></label>`
-        : a.type === 'peers'
-          ? `${input('Required router names', 'rule-targets', (Array.isArray(a.targets) ? a.targets : []).join(', '), 'Comma-separated inventory names')}<label class="toggle-row">Require matching reverse endpoints<input id="rule-reciprocal" type="checkbox" ${a.reciprocal ? 'checked' : ''}></label>`
-          : `${input('Filter chain', 'rule-chain', a.chain)}${input('Route prefix', 'rule-prefix', a.prefix)}<label class="field">Must be<select id="rule-decision">${options(
+            a.operator,
+          )}</select></label>${input('Expected JSON value', 'rule-value', JSON.stringify(a.value ?? null), 'Examples: false, 1500, ["connected", "vpn"]')}`
+        : a.type === 'packet'
+          ? `${input('Source IPv4', 'rule-source', a.source)}<div class="field-row"><label class="field">Protocol<select id="rule-protocol">${options(
+              ['udp', 'tcp', 'icmp', 'ospf'].map((x) => [x, x]),
+              a.protocol,
+            )}</select></label>${input('Destination port', 'rule-port', a.port)}</div><label class="field">Must be<select id="rule-decision">${options(
               [
                 ['accept', 'accepted'],
-                ['reject', 'rejected'],
+                ['drop', 'dropped'],
               ],
               a.decision,
-            )}</select></label>`;
-  content.innerHTML = `<div class="stage-intro"><h2>Design a reusable rule</h2><p>Scope the assertion, define what must hold, and save to run it against your semantic routers. Edit either the form or the definition.</p></div><div class="rule-author"><form id="rule-builder"><h3>Rule builder</h3>${input('Rule name', 'rule-name', rule.name)}<label class="field">Applies to<select id="rule-scope">${options(
-    [
-      ['', 'All loaded routers'],
-      ['bng', 'BNGs'],
-      ['border', 'Borders'],
-      ['edge', 'Edges'],
-      ['core', 'Cores'],
-      ['switch', 'Distribution switches'],
-    ],
-    scoped,
-  )}</select></label>${input('Specific router names (optional)', 'rule-names', (Array.isArray(rule.scope?.names) ? rule.scope.names : []).join(', '), 'Comma-separated names; combined with the role scope')}<label class="field">Assertion<select id="rule-kind">${options(
+            )}</select></label>`
+          : a.type === 'peers'
+            ? `${input('Required router names', 'rule-targets', (Array.isArray(a.targets) ? a.targets : []).join(', '), 'Comma-separated inventory names')}<label class="toggle-row">Require matching reverse endpoints<input id="rule-reciprocal" type="checkbox" ${a.reciprocal ? 'checked' : ''}></label>`
+            : `${input('Filter chain', 'rule-chain', a.chain)}${input('Route prefix', 'rule-prefix', a.prefix)}<label class="field">Must be<select id="rule-decision">${options(
+                [
+                  ['accept', 'accepted'],
+                  ['reject', 'rejected'],
+                ],
+                a.decision,
+              )}</select></label>`;
+  content.innerHTML = `<div class="stage-intro"><h2>Design a reusable rule</h2><p>Scope the assertion, define what must hold, and save to run it against your semantic routers. Edit either the form or the definition.</p></div><div class="rule-author"><form id="rule-builder"><h3>Rule builder</h3>${input('Rule name', 'rule-name', rule.name)}${input('Roles (optional)', 'rule-scope', roles.join(', '), 'Comma-separated role names; blank selects every role')}${input('Specific router names (optional)', 'rule-names', (Array.isArray(rule.scope?.names) ? rule.scope.names : []).join(', '), 'Comma-separated names; combined with the role scope')}<label class="field">Assertion<select id="rule-kind">${options(
     [
       ['packet', 'Packet decision'],
       ['field', 'Model field / collection'],
       ['peers', 'Required BGP peerings'],
       ['route', 'Route decision'],
+      ['expression', 'Custom logic'],
     ],
     a.type,
-  )}</select></label>${assertion}<div class="field-row"><label class="field">Failure priority<select id="rule-severity">${options(
+  )}</select></label>${assertion}<label class="field">Parameters (JSON)<textarea id="rule-params" class="rule-parameters" spellcheck="false">${esc(JSON.stringify(rule.params || {}, null, 2))}</textarea></label><div class="field-row"><label class="field">Failure priority<select id="rule-severity">${options(
     [
       ['P1', 'P1'],
       ['P2', 'P2'],
@@ -569,6 +653,8 @@ function ruleFromForm() {
   const existing = savedRule(),
     kind = $('#rule-kind').value;
   let assertion;
+  if (kind === 'expression')
+    assertion = { type: kind, test: JSON.parse($('#rule-expression').value) };
   if (kind === 'field') {
     const operator = $('#rule-operator').value;
     assertion = { type: kind, path: $('#rule-path').value.trim(), operator };
@@ -598,12 +684,15 @@ function ruleFromForm() {
       prefix: $('#rule-prefix').value.trim(),
       decision: $('#rule-decision').value,
     };
-  const role = $('#rule-scope').value;
+  const roles = $('#rule-scope')
+    .value.split(',')
+    .map((role) => role.trim())
+    .filter(Boolean);
   return {
     ...existing,
     name: $('#rule-name').value.trim(),
     scope: {
-      ...(role ? { roles: [role] } : {}),
+      ...(roles.length ? { roles } : {}),
       ...($('#rule-names').value.trim()
         ? {
             names: $('#rule-names')
@@ -614,11 +703,13 @@ function ruleFromForm() {
         : {}),
     },
     assert: assertion,
+    params: JSON.parse($('#rule-params').value),
     severity: $('#rule-severity').value,
     enabled: $('#rule-enabled').checked,
   };
 }
 async function saveRule() {
+  const revision = state.revision;
   const id = selectedRule;
   try {
     const candidate = builderDirty
@@ -628,6 +719,8 @@ async function saveRule() {
       throw new Error('Keep the rule id unchanged; duplicate to create another file.');
     const rules = state.rules.filter((r) => r.id !== id).concat(candidate);
     await callEngine('rules_validate', { rules });
+    if (state.revision !== revision)
+      throw new Error('The rule list changed while saving. Please try again.');
     state.rules = rules;
     newRules.delete(id);
     drafts.set(id, JSON.stringify(candidate, null, 2));
@@ -643,12 +736,7 @@ async function saveRule() {
 function renderTests(content) {
   const results = state.ruleResults || [],
     counts = totals(results);
-  content.innerHTML = `<div class="stage-intro"><h2>Test the intended configuration</h2><p>These are the results of your saved rule files. Click a result to open its definition and router context.</p></div><div class="test-totals">${['pass', 'fail', 'unknown', 'skip'].map((status) => `<span class="test-status ${status}">${counts[status]} ${status}</span>`).join('')}</div><label class="toggle-row preset-toggle">Also run the built-in estate checks<input id="estate-checks" type="checkbox" ${state.includeEstate ? 'checked' : ''}></label><div class="rule-results"><table><thead><tr><th>Result</th><th>Rule / router</th><th>Observed evidence</th></tr></thead><tbody>${results.map((result, index) => `<tr><td><span class="test-status ${result.status}">${result.status.toUpperCase()}</span></td><td><button data-result="${index}" class="text-button">${esc(result.rule_name)}<br><small>${esc(result.device)}</small></button></td><td>${esc(result.message)}${result.observed !== null ? `<pre>${esc(JSON.stringify(result.observed))}</pre>` : ''}</td></tr>`).join('') || '<tr><td colspan="3">Create a rule and run it to see pass/fail evidence here.</td></tr>'}</tbody></table></div>`;
-  $('#estate-checks').onchange = async () => {
-    state.includeEstate = $('#estate-checks').checked;
-    state.revision++;
-    await hooks.runChecks(false);
-  };
+  content.innerHTML = `<div class="stage-intro"><h2>Test the intended configuration</h2><p>These are the results of your saved rule files. Click a result to open its definition and router context.</p></div><div class="test-totals">${['pass', 'fail', 'unknown', 'skip'].map((status) => `<span class="test-status ${status}">${counts[status]} ${status}</span>`).join('')}</div><div class="rule-results"><table><thead><tr><th>Result</th><th>Rule / router</th><th>Observed result</th></tr></thead><tbody>${results.map((result, index) => `<tr><td><span class="test-status ${result.status}">${result.status.toUpperCase()}</span></td><td><button data-result="${index}" class="text-button">${esc(result.rule_name)}<br><small>${esc(result.device)}</small></button></td><td>${esc(result.message)}${result.observed !== null ? `<pre>${esc(JSON.stringify(result.observed))}</pre>` : ''}</td></tr>`).join('') || '<tr><td colspan="3">Create a rule and run it to see pass/fail results here.</td></tr>'}</tbody></table></div>`;
   content.querySelectorAll('[data-result]').forEach(
     (b) =>
       (b.onclick = () => {
@@ -674,10 +762,7 @@ function renderContext() {
             `<div class="model-change"><code>${esc(change.path)}</code><del>${esc(JSON.stringify(change.before))}</del><ins>${esc(JSON.stringify(change.after))}</ins></div>`,
         )
         .join('') || '<p class="helper">No changes from the loaded snapshot.</p>'
-    }<details class="metadata-details"><summary>Inventory metadata (${state.findings.filter(metadata).length})</summary><p class="helper">Missing exact versions belong to inventory, not repeated configuration failures. Record a source version before parsing when you know it.</p>${state.findings
-      .filter(metadata)
-      .map((f) => `<p><strong>${esc(f.device)}</strong><br>${esc(f.message)}</p>`)
-      .join('')}</details>`;
+    }`;
 }
 function changes(router) {
   const baseline = state.originals.get(router.name);

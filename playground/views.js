@@ -67,7 +67,7 @@ function renderMetrics() {
     ['unknown', 'UNKNOWN'],
   ])
     $('#metric-' + id).textContent = state.findings.filter(
-      (f) => f.severity === severity && f.check !== 'firmware.exact-version',
+      (f) => f.severity === severity,
     ).length;
 }
 
@@ -108,7 +108,24 @@ function renderMap() {
     state.routers
       .map((r) => {
         const p = positions.get(r.name);
-        return `<button class="map-node ${r.name === state.selected ? 'selected' : ''}" data-node="${esc(r.name)}" style="left:${p.x}%;top:${p.y}%" aria-label="Inspect ${esc(r.name)}" aria-pressed="${r.name === state.selected}"><strong><i class="node-dot ${countFor(r.name) ? 'has-issues' : ''}"></i>${esc(r.name)}</strong><small>${esc(r.role.toUpperCase())}</small></button>`;
+        const results = state.ruleResults.filter(
+          (result) => result.device === r.name && result.status !== 'skip',
+        );
+        const testStatus = !results.length
+          ? 'unvalidated'
+          : results.some((result) => result.status === 'fail')
+            ? 'has-issues'
+            : results.some((result) => result.status === 'unknown')
+              ? 'unresolved'
+              : '';
+        const testLabel = !results.length
+          ? 'not tested'
+          : testStatus === 'has-issues'
+            ? 'tests failed'
+            : testStatus === 'unresolved'
+              ? 'tests unresolved'
+              : 'selected tests passed';
+        return `<button class="map-node ${r.name === state.selected ? 'selected' : ''}" data-node="${esc(r.name)}" style="left:${p.x}%;top:${p.y}%" aria-label="Inspect ${esc(r.name)} — ${testLabel}" aria-pressed="${r.name === state.selected}"><strong><i class="node-dot ${testStatus}"></i>${esc(r.name)}</strong><small>${esc(r.role.toUpperCase())}</small></button>`;
       })
       .join('');
   $('#network-map')
@@ -201,9 +218,9 @@ function renderObjects(r) {
         kv('DNS', r.dns.join(', ') || 'not set'),
     ) +
     card(
-      'Source evidence',
+      'Conversion support',
       r.unexported.length + ' conversion gaps',
-      '<p class="helper">Open Export in the config flow to inspect the statements that need target mappings. Inventory metadata is available in the workbench context panel.</p>',
+      '<p class="helper">Open Export in the config flow to inspect the statements that need target mappings. </p>',
     )
   );
 }
@@ -263,7 +280,6 @@ function renderFindings() {
     severity = $('#severity-filter').value;
   const items = state.findings.filter(
     (f) =>
-      f.check !== 'firmware.exact-version' &&
       (scope !== 'selected' || f.device === state.selected) &&
       (severity === 'all' || f.severity === severity),
   );

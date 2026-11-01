@@ -39,18 +39,6 @@
           ><input id="search" placeholder="Find a router…" aria-label="Find a router"
         /></label>
         <div id="device-list"></div>
-        <section class="rule-explorer">
-          <div class="sidebar-title"><span>RULE FILES</span></div>
-          <div id="rule-files"></div>
-          <label class="new-template"
-            ><select id="new-rule-kind" aria-label="New rule template">
-              <option value="packet">Monitoring packet</option>
-              <option value="field">Model assertion</option>
-              <option value="peers">BGP peer mesh</option>
-              <option value="route">Route decision</option>
-            </select></label
-          ><button id="new-rule" class="button">+ New rule</button>
-        </section>
         <div class="sidebar-footer">
           <span class="eyebrow">PROJECT</span>
           <p>
@@ -68,15 +56,15 @@
       <main>
         <div class="page-heading">
           <div>
-            <div class="eyebrow">CONFIGURATION → MODEL → INTENT → TESTS</div>
-            <h1>Design the network you intend.</h1>
+            <div class="eyebrow">INTENT → CONFIGURATION → MODEL → TESTS</div>
+            <h1>Define tests. Design the network.</h1>
             <p>
               Author rules, work through configuration changes, and test the result
               before exporting.
             </p>
           </div>
           <div class="inline-actions">
-            <button id="edit-policy" class="button">Estate settings</button
+            <button id="edit-policy" class="button">Suite variables</button
             ><button id="run-checks" class="button primary">▶ Run tests</button>
           </div>
         </div>
@@ -119,6 +107,44 @@
         </div>
         <div id="notice" class="notice" role="status" hidden></div>
 
+        <section class="test-design" aria-label="Active test suite">
+          <div class="test-design-heading">
+            <div>
+              <div class="eyebrow">START WITH INTENT</div>
+              <h2>Test design <span id="rule-file-count"></span></h2>
+              <p>
+                Choose the rules this network must satisfy. Every check is yours to
+                edit.
+              </p>
+            </div>
+            <div class="inline-actions">
+              <button id="import-suite" class="button">Import suite</button
+              ><button id="download-suite" class="button">Download suite</button
+              ><input id="suite-input" type="file" accept=".json" hidden />
+            </div>
+          </div>
+          <div class="suite-actions">
+            <div>
+              <select id="suite-example" aria-label="Optional example suite"></select
+              ><button id="add-example" class="button">Add example suite</button>
+            </div>
+            <div>
+              <select id="new-rule-kind" aria-label="New rule template">
+                <option value="field">Model assertion</option>
+                <option value="packet">Packet decision</option>
+                <option value="peers">Required peerings</option>
+                <option value="route">Route decision</option>
+                <option value="expression">Custom logic</option></select
+              ><button id="new-rule" class="button primary">+ Create test</button>
+            </div>
+          </div>
+          <div id="rule-files" class="test-catalog"></div>
+          <p class="helper">
+            Only these saved rules run. Examples are optional; importing configs never
+            enables policy.
+          </p>
+        </section>
+
         <section
           id="config-workbench"
           class="config-workbench"
@@ -144,14 +170,14 @@
           </div>
           <div>
             <span>High priority</span><strong id="metric-p1" class="red">—</strong
-            ><small>Configuration policy failures</small>
+            ><small>High-priority test failures</small>
           </div>
           <div>
             <span>Review suggested</span><strong id="metric-p2" class="amber">—</strong
-            ><small>Drift and additional sources</small>
+            ><small>Lower-priority test failures</small>
           </div>
           <div>
-            <span>Needs evidence</span><strong id="metric-unknown">—</strong
+            <span>Unresolved tests</span><strong id="metric-unknown">—</strong
             ><small>Unknown is never a pass</small>
           </div>
         </section>
@@ -294,22 +320,22 @@
     <dialog id="policy-dialog">
       <form id="policy-form">
         <div class="dialog-heading">
-          <h2>Network policy</h2>
+          <h2>Suite variables</h2>
           <button
             type="button"
             id="close-policy"
             class="icon-button"
-            aria-label="Close policy editor"
+            aria-label="Close variables editor"
           >
             ×
           </button>
         </div>
         <p>
-          Set canonical SNMP sources, required borders and public aggregates. These
-          values feed the deterministic assertions across every loaded model.
+          Optional shared JSON values for your rules. Reference them as vars.name in
+          custom logic. Each rule can also define its own editable parameters.
         </p>
         <label
-          >Policy JSON<textarea
+          >Variables JSON<textarea
             id="policy-json"
             rows="17"
             spellcheck="false"

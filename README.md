@@ -28,12 +28,12 @@ python3 -m pip install -e .
 semanticrouter inspect examples/configs/example-bng.cfg
 semanticrouter export tests/fixtures/routeros6.rsc \
   --vendor routeros --version 7.19.3 --output /tmp/migrated.rsc
-semanticrouter audit examples/configs --policy examples/demo-policy.json
+semanticrouter audit examples/configs --rules semanticrouter/suites/baseline.json
 ```
 
-The demo intentionally produces a RouterOS 6 policy finding. Exit `1` means an audit
-contains P1 failures; exit `2` means invalid input, unresolved evidence or an
-incomplete/unsupported export. P2-only audits exit `0`.
+No network policy is active by default. Choose or author a suite explicitly. Exit `1`
+means an audit contains P1 failures; exit `2` means invalid input, unresolved results,
+or an incomplete/unsupported export. P2-only audits exit `0`.
 
 All bundled configs are synthetic documentation-range fixtures. Your own exports stay in
 directories you choose. The optional Brighton example supplies estate policy and device
@@ -51,12 +51,16 @@ Visualiser, database, Sites account, API key, or external application. The build
 downloads pinned Pyodide assets once; generated pages serve the Python runtime and
 middleware from the same origin. System fonts require no external stylesheet.
 
-The workbench follows **source → semantic model → rule files → test results → export**.
-Select a router, edit its source or model, and define reusable rules using a form or
-JSON. Rules can assert model fields/collections, ordered input-firewall decisions,
-reciprocal BGP peerings, and route-filter decisions. Scope them to roles or named
-routers. Save a rule to evaluate it against the current models; inspect pass, fail,
-unknown and skipped results with links back to the rule or source evidence.
+The workbench starts with **test design → source → semantic model → run tests →
+export**. Active rules are prominent choices above the editor, with per-rule Run
+switches. A fresh workspace has no active rules. Add an optional example suite or create
+your own; importing configs never enables hidden checks. Every assertion, scope,
+parameter and priority is editable. Select a router, edit its source or model, and
+define reusable rules using a form or JSON. Rules can assert model fields/collections,
+ordered input-firewall decisions, reciprocal BGP peerings, and route-filter decisions.
+Scope them to roles or named routers. Save a rule to evaluate it against the current
+models; inspect pass, fail, unknown and skipped results with links back to the rule or
+source evidence.
 
 Saved rules persist in this browser. Download a workspace to retain models, rule files,
 policy and attached sources together. Model edits rerun assertions without reparsing
@@ -92,7 +96,9 @@ extension points.
 - RouterOS 6/7 export import, including terse/section syntax and BGP inheritance.
 - Supported-subset RouterOS 7.1–7.19 rendering and Cisco IOS 15 input ACL artifacts.
 - Ordered firewall/route evaluation, with **unknown distinct from pass**.
-- A built-in Brighton policy preset for management, BNG services and border mesh.
+- Optional editable example suites, including 29 Brighton estate checks; none
+  auto-enabled.
+- Composable JSON predicates for collection, cross-router and route-policy assertions.
 - Source file/line evidence and strict JSON hydration of common models.
 
 Full exports fail on uncovered features. A partial fragment requires explicit

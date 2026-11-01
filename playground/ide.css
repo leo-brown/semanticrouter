@@ -70,48 +70,125 @@ body:not(.network-overview) .metrics strong {
 .network-overview .workspace-grid {
   margin-top: 1.25rem;
 }
-.rule-explorer {
-  margin-top: 1.5625rem;
-  border-top: 1px solid var(--line);
-  padding-top: 1.1875rem;
+/* Test selection is the main design surface, ahead of config/model editing. */
+.test-design {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 0.4375rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.network-overview .test-design {
+  display: none;
+}
+.test-design-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.test-design h2 {
+  font-size: 1rem;
+  margin: 0.3rem 0;
+}
+#rule-file-count {
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 0.5rem;
+}
+.test-design-heading p {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.suite-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+.suite-actions > div {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.suite-actions select {
+  font: inherit;
+  font-size: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 0.25rem;
+  padding: 0.4rem;
+  background: white;
+  max-width: 100%;
+}
+.test-catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.5rem;
+  max-height: 13rem;
+  overflow: auto;
+  margin-bottom: 0.7rem;
 }
 .rule-file {
   display: block;
   width: 100%;
-  border: 0;
-  background: none;
+  border: 1px solid var(--line);
+  background: white;
   text-align: left;
-  color: #52675e;
-  padding: 0.625rem 0.5rem;
-  border-radius: 0.25rem;
+  color: var(--ink);
+  padding: 0.65rem;
+  border-radius: 0.3rem;
 }
 .rule-file span {
   display: block;
-  font: 0.625rem var(--mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.rule-file code {
+  display: block;
+  font: 0.55rem var(--mono);
   overflow-wrap: anywhere;
+  color: var(--muted);
+  margin-top: 0.3rem;
 }
 .rule-file small {
   display: block;
-  font-size: 0.5625rem;
-  color: #82968a;
-  margin-top: 0.3125rem;
+  font-size: 0.6rem;
+  color: #687e72;
+  margin-top: 0.3rem;
 }
 .rule-file.selected {
   background: #e6f2ed;
+  border-color: var(--teal);
   color: var(--teal);
 }
-.new-template select {
-  width: 100%;
-  font-size: 0.625rem;
-  border: 1px solid var(--line);
-  padding: 0.5rem;
-  background: white;
-  border-radius: 0.25rem;
-  margin: 0.625rem 0;
+.test-empty {
+  padding: 1rem;
+  font-size: 0.75rem;
+  grid-column: 1/-1;
+  background: #f5f8f6;
+  border-radius: 0.3rem;
 }
-.rule-explorer > .button {
+.test-empty p {
+  margin-top: 0.4rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.rule-logic,
+.rule-parameters {
   width: 100%;
-  font-size: 0.6875rem;
+  min-height: 8rem;
+  font: 0.65rem/1.6 var(--mono);
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.25rem;
+  resize: vertical;
+}
+.rule-logic {
+  min-height: 15rem;
 }
 .config-workbench {
   background: #fff;
@@ -508,9 +585,6 @@ body:not(.network-overview) .metrics strong {
   .layout {
     display: block;
   }
-  .sidebar .rule-explorer {
-    display: block;
-  }
   main {
     padding: 1.25rem 0.75rem;
   }
@@ -542,4 +616,26 @@ body:not(.network-overview) .metrics strong {
   .stage-intro h2 {
     font-size: 1.0625rem;
   }
+}
+
+.rule-entry {
+  border: 1px solid var(--line);
+  border-radius: 0.3rem;
+  overflow: hidden;
+}
+.rule-entry .rule-file {
+  border: 0;
+  border-radius: 0;
+}
+.rule-run {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  padding: 0.3rem 0.65rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.6rem;
+  color: var(--muted);
+}
+.rule-run input {
+  accent-color: var(--teal);
 }

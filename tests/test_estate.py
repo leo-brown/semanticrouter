@@ -6,9 +6,10 @@ import unittest
 from pathlib import Path
 
 from semanticrouter import UnsupportedExport, export_router, load
-from semanticrouter.policy import audit
+from semanticrouter.policy import audit_brighton as audit
 from semanticrouter.redaction import redact_export
 from semanticrouter.rules import run_rules
+from semanticrouter.suites import example_suites
 
 
 @unittest.skipUnless(
@@ -65,16 +66,14 @@ class EstateTests(unittest.TestCase):
     def test_authored_rules_evaluate_private_models_and_mutations(self):
         from copy import deepcopy
 
-        rules = json.loads(
-            (Path(__file__).parents[1] / "playground/templates/rules.json").read_text()
-        )
+        rules = example_suites()[1]["rules"]
         results = run_rules(self.routers, rules)
         self.assertEqual(len(results), len(rules) * 12)
         self.assertTrue(
             all(r.status in {"pass", "fail", "unknown", "skip"} for r in results)
         )
         router = deepcopy(next(r for r in self.routers if r.role == "bng"))
-        assertion = next(rule for rule in rules if rule["id"] == "bng-conntrack")
+        assertion = next(rule for rule in rules if rule["id"] == "bng.conntrack")
         router.firewall_v4.connection_tracking = False
         self.assertEqual(run_rules([router], [assertion])[0].status, "pass")
         router.firewall_v4.connection_tracking = True

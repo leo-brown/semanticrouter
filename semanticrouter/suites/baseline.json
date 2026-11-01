@@ -1,0 +1,184 @@
+{
+  "id": "baseline-example",
+  "name": "Minimal infrastructure example",
+  "description": "Optional starting point: final input protection and identity naming. Nothing is enabled until you add it.",
+  "rules": [
+    {
+      "id": "firewall.input-final-drop",
+      "name": "Input policy ends with an unconditional drop or reject",
+      "description": "Input policy ends with an unconditional drop or reject. All intent and values are editable in this definition.",
+      "suite": "baseline-example",
+      "enabled": true,
+      "severity": "P1",
+      "scope": {},
+      "params": {},
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "and",
+          "args": [
+            {
+              "op": "gt",
+              "args": [
+                {
+                  "op": "length",
+                  "args": [
+                    {
+                      "op": "filter",
+                      "items": {
+                        "ref": "router.firewall_v4.rules"
+                      },
+                      "as": "f",
+                      "test": {
+                        "op": "and",
+                        "args": [
+                          {
+                            "ref": "f.enabled"
+                          },
+                          {
+                            "op": "eq",
+                            "args": [
+                              {
+                                "ref": "f.chain"
+                              },
+                              "input"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                0
+              ]
+            },
+            {
+              "op": "in",
+              "args": [
+                {
+                  "op": "get",
+                  "args": [
+                    {
+                      "op": "last",
+                      "args": [
+                        {
+                          "op": "filter",
+                          "items": {
+                            "ref": "router.firewall_v4.rules"
+                          },
+                          "as": "f",
+                          "test": {
+                            "op": "and",
+                            "args": [
+                              {
+                                "ref": "f.enabled"
+                              },
+                              {
+                                "op": "eq",
+                                "args": [
+                                  {
+                                    "ref": "f.chain"
+                                  },
+                                  "input"
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    "action"
+                  ]
+                },
+                [
+                  "drop",
+                  "reject"
+                ]
+              ]
+            },
+            {
+              "op": "unconditional",
+              "args": [
+                {
+                  "op": "last",
+                  "args": [
+                    {
+                      "op": "filter",
+                      "items": {
+                        "ref": "router.firewall_v4.rules"
+                      },
+                      "as": "f",
+                      "test": {
+                        "op": "and",
+                        "args": [
+                          {
+                            "ref": "f.enabled"
+                          },
+                          {
+                            "op": "eq",
+                            "args": [
+                              {
+                                "ref": "f.chain"
+                              },
+                              "input"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "identity",
+      "name": "Configured identity matches inventory name",
+      "description": "Configured identity matches inventory name. All intent and values are editable in this definition.",
+      "suite": "baseline-example",
+      "enabled": true,
+      "severity": "P2",
+      "scope": {},
+      "params": {},
+      "assert": {
+        "type": "expression",
+        "test": {
+          "op": "or",
+          "args": [
+            {
+              "op": "eq",
+              "args": [
+                {
+                  "ref": "router.identity"
+                },
+                {
+                  "ref": "router.name"
+                }
+              ]
+            },
+            {
+              "op": "starts_with",
+              "args": [
+                {
+                  "ref": "router.identity"
+                },
+                {
+                  "op": "concat",
+                  "args": [
+                    {
+                      "ref": "router.name"
+                    },
+                    "."
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

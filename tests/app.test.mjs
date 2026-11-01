@@ -18,6 +18,7 @@ test('standalone startup, JSON edit and reset work through the real module graph
     dataset: { tab },
     classList: { toggle() {} },
   }));
+  const ruleToggle = { dataset: { enableRule: 'snmp' }, checked: true };
   const element = (selector) => {
     if (!elements.has(selector))
       elements.set(selector, {
@@ -29,7 +30,9 @@ test('standalone startup, JSON edit and reset work through the real module graph
         setAttribute() {},
         append() {},
         parentElement: { querySelector: () => ({ textContent: '' }) },
-        querySelectorAll() {
+        querySelectorAll(query) {
+          if (selector === '#rule-files' && query === '[data-enable-rule]')
+            return [ruleToggle];
           return [];
         },
       });
@@ -84,6 +87,13 @@ test('standalone startup, JSON edit and reset work through the real module graph
   const snapshot = {
     routers: [router],
     rules: [definition],
+    rule_suites: [
+      {
+        id: 'optional',
+        name: 'Optional example',
+        rules: [{ ...definition, id: 'optional-rule', name: 'Example rule' }],
+      },
+    ],
     policy: { snmp_pollers: [] },
     findings: [],
     mode: 'synthetic demo',
@@ -100,7 +110,14 @@ test('standalone startup, JSON edit and reset work through the real module graph
           data:
             message.action === 'boot'
               ? { type: 'ready' }
-              : { id: message.id, ok: true, findings: [] },
+              : {
+                  id: message.id,
+                  ok: true,
+                  findings: [],
+                  ...(message.action === 'suite_validate'
+                    ? { suite: message.suite }
+                    : {}),
+                },
         }),
       );
     }
@@ -109,6 +126,11 @@ test('standalone startup, JSON edit and reset work through the real module graph
     await import('../playground/app.js');
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(state.engineReady, true);
+    assert.match(
+      element('#network-map').innerHTML,
+      /unvalidated/,
+      'untested nodes are not shown as passing',
+    );
     assert.equal(element('#selected-name').textContent, 'demo');
     assert.match(element('#inspector-content').innerHTML, /FirewallV4/);
 
@@ -120,7 +142,9 @@ test('standalone startup, JSON edit and reset work through the real module graph
     assert.equal(state.routers[0].identity, 'edited-demo');
     assert.equal(state.modified.has('demo'), true);
 
-    const { openEvidence } = await import('../playground/workbench.js');
+    const { openEvidence, initializeWorkbench } = await import(
+      '../playground/workbench.js'
+    );
     openEvidence({ device: 'demo', rule_id: 'snmp' });
     const updated = { ...definition, name: 'Author edited rule' };
     element('#rule-definition').value = JSON.stringify(updated);
@@ -162,6 +186,52 @@ test('standalone startup, JSON edit and reset work through the real module graph
     await element('#reset-all').onclick();
     assert.equal(state.routers[0].identity, 'demo');
     assert.equal(state.modified.size, 0);
+    assert.equal(state.rules.length, 1, 'examples never activate on startup');
+    element('#suite-example').value = '0';
+    await element('#add-example').onclick();
+    assert.equal(
+      state.rules.length,
+      2,
+      'explicit example selection adds editable rules',
+    );
+    assert.equal(
+      state.rules.find((rule) => rule.id === 'snmp').name,
+      'Author edited rule',
+    );
+    await element('#add-example').onclick();
+    assert.equal(
+      state.rules.length,
+      2,
+      'adding again does not overwrite or duplicate rules',
+    );
+    openEvidence({ device: 'demo', rule_id: 'optional-rule' });
+    assert.equal(JSON.parse(element('#rule-definition').value).id, 'optional-rule');
+    ruleToggle.checked = false;
+    await ruleToggle.onchange();
+    assert.equal(state.rules.find((rule) => rule.id === 'snmp').enabled, false);
+    openEvidence({ device: 'demo', rule_id: 'snmp' });
+    assert.equal(
+      JSON.parse(element('#rule-definition').value).enabled,
+      false,
+      'Run choice updates the saved editor definition',
+    );
+    assert.ok(
+      requests
+        .filter((request) => request.action === 'audit')
+        .every((request) => !('include_estate' in request)),
+    );
+    saved.set('semanticrouter-rule-files-v1', '[]');
+    initializeWorkbench(
+      { ...snapshot, rules: [] },
+      { runChecks: async () => {}, render: () => {}, select: () => {} },
+    );
+    assert.equal(state.rules.length, 0);
+    assert.equal(
+      element('#ide-primary').disabled,
+      true,
+      'an empty suite cannot save a nonexistent rule',
+    );
+    assert.match(element('#rule-files').innerHTML, /No tests selected yet/);
   } finally {
     Object.assign(globalThis, originals);
   }

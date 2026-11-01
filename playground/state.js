@@ -18,7 +18,7 @@ export const state = {
   ruleResults: [],
   sources: {},
   sourceRedacted: {},
-  includeEstate: true,
+  ruleSuites: [],
 };
 
 /** Find the selected semantic object in the current workspace, not in the immutable baseline. */

@@ -16,7 +16,6 @@ from urllib.request import urlopen
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from semanticrouter import load  # noqa: E402 -- support direct execution from a clean checkout
-from semanticrouter.policy import audit  # noqa: E402 -- project root is added above
 
 
 def build(
@@ -26,6 +25,7 @@ def build(
     download_runtime=False,
     snapshot=None,
     visualiser=False,
+    inventory=None,
 ):
     """Create a standalone static playground or an optional authenticated PHP bundle.
 
@@ -105,10 +105,12 @@ def build(
     (output / "engine.json").write_text(json.dumps(bundle))
     from semanticrouter.redaction import redact_export
     from semanticrouter.rules import run_rules
+    from semanticrouter.suites import example_suites
 
     sources = {}
-    rules = json.loads((ROOT / "playground/templates/rules.json").read_text())
-    policy = json.loads((ROOT / "examples/brighton.json").read_text())
+    rules = []
+    suites = example_suites()
+    policy = {}
     if snapshot:
         from semanticrouter.serialization import router_from_dict
 
@@ -122,33 +124,44 @@ def build(
         }
         rules = values.get("rules", rules)
     elif config_dir:
-        routers = [
-            load(Path(config_dir) / (name + ".cfg")) for name in policy["devices"]
-        ]
-        mode = "private estate snapshot"
+        directory = Path(config_dir)
+        if inventory:
+            names = json.loads(Path(inventory).read_text())["devices"]
+            paths = [directory / (name + ".cfg") for name in names]
+        else:
+            paths = sorted(
+                path
+                for pattern in ("*.cfg", "*.rsc")
+                for path in directory.glob(pattern)
+                if not path.name.startswith(".")
+            )
+        if not paths:
+            raise ValueError("No .cfg or .rsc exports found in the config directory")
+        routers = [load(path) for path in paths]
+        if len({router.name for router in routers}) != len(routers):
+            raise ValueError("Config filenames must produce unique router names")
+        mode = "private configuration snapshot"
         sources = {
-            name: redact_export((Path(config_dir) / (name + ".cfg")).read_text())
-            for name in policy["devices"]
+            router.name: redact_export(path.read_text())
+            for router, path in zip(routers, paths)
         }
     else:
         router = load(ROOT / "tests/fixtures/routeros6.rsc")
         router.name = "example-bng"
         routers = [router]
-        policy = {
-            "devices": [router.name],
-            "snmp_pollers": ["198.51.100.9"],
-            "borders": [],
-            "public_prefixes": ["203.0.113.0/24"],
-        }
         mode = "synthetic demo"
         sources = {
             router.name: redact_export(
                 (ROOT / "tests/fixtures/routeros6.rsc").read_text()
             )
         }
-        rules = [rules[0]]
-        rules[0]["assert"]["source"] = "198.51.100.9"
+
+    if not snapshot:
+        # Dataset selection is separate from test intent: no customer IPs or roles
+        # become active checks merely because configs were imported.
+        policy = {}
     values = [r.to_dict() for r in routers]
+    results = run_rules(routers, rules, policy)
 
     # Remove local machine paths; keep file/line evidence without transporting raw exports.
     def sanitize(value):
@@ -166,18 +179,32 @@ def build(
             return [sanitize(item) for item in value]
         return value
 
-    data = sanitize(
-        {
-            "routers": values,
-            "policy": policy,
-            "findings": [f.to_dict() for f in audit(routers, policy)],
-            "mode": mode,
-            "sources": sources,
-            "sources_redacted": True,
-            "rules": rules,
-            "rule_results": [asdict(result) for result in run_rules(routers, rules)],
-        }
-    )
+    data = {
+        "routers": sanitize(values),
+        "policy": policy,
+        "findings": sanitize(
+            [
+                {
+                    "device": result.device,
+                    "check": "custom." + result.rule_id,
+                    "severity": "UNKNOWN"
+                    if result.status == "unknown"
+                    else result.severity,
+                    "message": result.rule_name + ": " + result.message,
+                    "rule_id": result.rule_id,
+                    "source": None,
+                }
+                for result in results
+                if result.status in {"fail", "unknown"}
+            ]
+        ),
+        "mode": mode,
+        "sources": sources,
+        "sources_redacted": True,
+        "rules": rules,
+        "rule_results": [asdict(result) for result in results],
+        "rule_suites": suites,
+    }
     if visualiser:
         # Both the HTML entry point and model data use the existing visualiser auth.
         # No operational JSON file is ever written to the web directory.
@@ -226,6 +253,10 @@ if __name__ == "__main__":
         help="Include private semantic snapshots from this config directory",
     )
     parser.add_argument(
+        "--inventory",
+        help="Optional JSON devices list selecting configs; does not activate rules",
+    )
+    parser.add_argument(
         "--runtime-dir",
         help="Directory containing the official Pyodide 314.0.7 core assets",
     )
@@ -253,4 +284,5 @@ if __name__ == "__main__":
         args.download_runtime,
         args.snapshot,
         args.visualiser,
+        args.inventory,
     )

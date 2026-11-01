@@ -234,7 +234,9 @@ async function runChecks(showNotice = true) {
       refreshTests();
       if (showNotice)
         notify(
-          'Checks completed with the deterministic Python engine. No config was sent for ML processing.',
+          state.ruleResults.some((result) => result.status !== 'skip')
+            ? 'Saved tests evaluated against the semantic models.'
+            : 'No active tests matched this inventory. Choose or create tests before validating the design.',
         );
     }
   } catch (error) {

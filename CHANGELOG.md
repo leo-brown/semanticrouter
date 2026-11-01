@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- No implicit network policy: new workspaces start with no active rules.
+- Test design promoted to the main workspace, with explicit per-rule Run choices.
+- All 29 former estate checks moved into optional, fully editable example suites.
+- Bounded JSON expressions support custom logic, parameters and cross-router tests.
+- Portable suite import/export and generic CLI `audit --rules`; shared generic
+  variables.
+
 - IDE configuration flow with source/model drafts, rule files, test inspection and
   export.
 - Reusable declarative field, packet, reciprocal-peer and route-filter assertions.
