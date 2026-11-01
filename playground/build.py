@@ -4,6 +4,7 @@ No --config-dir: synthetic demo only. --config-dir: private deployment snapshots
 Raw config text and credentials are never copied to the output directory.
 """
 import argparse
+import base64
 import json
 from pathlib import Path
 import shutil
@@ -16,7 +17,7 @@ from semanticrouter import load
 from semanticrouter.policy import audit
 
 
-def build(output, config_dir=None, runtime_dir=None, download_runtime=False, snapshot=None):
+def build(output, config_dir=None, runtime_dir=None, download_runtime=False, snapshot=None, visualiser=False):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     for name in ('index.html', 'style.css', 'app.js', 'engine-worker.js', 'topology.js'):
@@ -72,7 +73,21 @@ def build(output, config_dir=None, runtime_dir=None, download_runtime=False, sna
         if isinstance(value,list): return [sanitize(item) for item in value]
         return value
     data = sanitize({'routers': values, 'policy': policy, 'findings': [f.to_dict() for f in audit(routers,policy)], 'mode': mode})
-    (output/'data.json').write_text(json.dumps(data))
+    if visualiser:
+        # Both the HTML entry point and model data use the existing visualiser auth.
+        # No operational JSON file is ever written to the web directory.
+        guard = "<?php\ndeclare(strict_types=1);\nrequire_once dirname(__DIR__) . '/auth.php';\n"
+        page_guard = guard + "if (!visualiserAuthValid()) { header('Location: ../'); exit; }\nheader('Cache-Control: no-store');\n?>\n"
+        html = (output/'index.html').read_text().replace('<body>', '<body data-snapshot-url="data.php">')
+        html = html.replace('href="./" aria-label="SemanticRouter home"', 'href="../" aria-label="Back to Network Visualiser"')
+        (output/'index.php').write_text(page_guard+html)
+        encoded = base64.b64encode(json.dumps(data).encode()).decode()
+        endpoint = guard + "header('Content-Type: application/json');\nheader('Cache-Control: no-store');\nrequireVisualiserAuth();\necho base64_decode('" + encoded + "');\n"
+        (output/'data.php').write_text(endpoint)
+        (output/'index.html').unlink()
+        if (output/'data.json').exists(): (output/'data.json').unlink()
+    else:
+        (output/'data.json').write_text(json.dumps(data))
     print(f'Built {len(routers)} semantic snapshots ({mode}) in {output}. No raw configs included.')
 
 
@@ -83,6 +98,7 @@ if __name__=='__main__':
     parser.add_argument('--runtime-dir',help='Directory containing the official Pyodide 314.0.7 core assets')
     parser.add_argument('--download-runtime',action='store_true',help='Fetch missing official Pyodide core assets')
     parser.add_argument('--snapshot',help='Rebuild from a saved semantic workspace JSON instead of source configs')
+    parser.add_argument('--visualiser',action='store_true',help='Build PHP-authenticated deployment inside visualiser/semanticrouter/')
     args=parser.parse_args()
     if args.snapshot and args.config_dir: parser.error('Choose either --snapshot or --config-dir')
-    build(args.output,args.config_dir,args.runtime_dir,args.download_runtime,args.snapshot)
+    build(args.output,args.config_dir,args.runtime_dir,args.download_runtime,args.snapshot,args.visualiser)

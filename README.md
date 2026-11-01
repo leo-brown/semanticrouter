@@ -229,3 +229,15 @@ and Web Worker support. Files are not uploaded to a backend, and nothing applies
 changes to network devices. Workspace/report downloads may contain network data.
 
 Topology relationship regressions also run with `node --test tests/topology.test.mjs` (Node 22+). Reverse BGP endpoints must match before a relationship is labelled reciprocal.
+
+To install alongside the PHP Network Visualiser using its existing GUID login:
+
+```sh
+python3 playground/build.py --visualiser --config-dir ../net-configs --output ../visualiser/semanticrouter --download-runtime
+```
+
+This generates an authenticated PHP page and data endpoint, without a public JSON
+snapshot. The output must be exactly one directory below the existing visualiser's
+`auth.php`. Rebuild after backup updates to refresh the bundled models; the browser
+can also import newer exports directly. Public assets contain only the UI, runtime
+and middleware source. There is no second login or dependency on Sites hosting.

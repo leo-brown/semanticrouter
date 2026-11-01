@@ -176,7 +176,7 @@ $('#file-input').onchange=async event=>{
 $('#import-form').onsubmit=async event=>{event.preventDefault();$('#import-submit').disabled=true;try{await importConfig($('#import-name').value.trim(),$('#import-text').value,$('#import-version').value.trim());$('#import-dialog').close();render();await runChecks(false);notify('Export parsed into semantic objects locally. Policy checks updated.');}catch(error){notify(error.message,true);}finally{$('#import-submit').disabled=false;}};
 async function main() {
   try{
-    const response=await fetch('./data.json');if(!response.ok)throw new Error('Snapshot could not be loaded.');
+    const response=await fetch(document.body.dataset.snapshotUrl || './data.json');if(!response.ok)throw new Error('Snapshot could not be loaded.');
     const data=await response.json();state.baseline=clone(data);state.routers=clone(data.routers);state.policy=clone(data.policy);state.findings=clone(data.findings);state.originals=new Map(state.routers.map(r=>[r.name,clone(r)]));state.selected=state.routers.find(r=>r.name==='bng-X1')?.name||state.routers[0].name;$('#snapshot-mode').textContent=data.mode;render();startEngine();
   }catch(error){notify('Unable to load the playground: '+error.message,true);engineStatus('Snapshot unavailable');}
 }

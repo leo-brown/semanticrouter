@@ -71,3 +71,28 @@ class PlaygroundTests(unittest.TestCase):
         self.request['routers'][0]['firewall_v4']['rules'][0]['enabled']=True
         second=self.call('audit')['findings']
         self.assertFalse(any(f['check']=='firewall.input-final-drop' for f in second))
+
+
+class VisualiserDeploymentTests(unittest.TestCase):
+    def test_operational_snapshot_has_no_public_json_copy(self):
+        import contextlib
+        import io
+        import tempfile
+        spec=importlib.util.spec_from_file_location('playground_build',ROOT/'playground/build.py')
+        builder=importlib.util.module_from_spec(spec);spec.loader.exec_module(builder)
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);runtime=root/'runtime';runtime.mkdir()
+            for name in ('pyodide.mjs','pyodide.asm.mjs','pyodide.asm.wasm','python_stdlib.zip','pyodide-lock.json'):
+                (runtime/name).write_bytes(b'test runtime placeholder')
+            output=root/'web'
+            with contextlib.redirect_stdout(io.StringIO()):
+                builder.build(output,runtime_dir=runtime,visualiser=True)
+            self.assertFalse((output/'data.json').exists())
+            self.assertFalse((output/'index.html').exists())
+            endpoint=(output/'data.php').read_text()
+            self.assertTrue(endpoint.startswith('<?php'))
+            self.assertLess(endpoint.index('requireVisualiserAuth();'),endpoint.index('echo base64_decode('))
+            page=(output/'index.php').read_text()
+            self.assertLess(page.index('visualiserAuthValid()'),page.index('<!doctype html>'))
+            self.assertIn('data-snapshot-url="data.php"',page)
+            self.assertIn('Back to Network Visualiser',page)
