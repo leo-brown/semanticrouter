@@ -96,3 +96,27 @@ class VisualiserDeploymentTests(unittest.TestCase):
             self.assertLess(page.index('visualiserAuthValid()'),page.index('<!doctype html>'))
             self.assertIn('data-snapshot-url="data.php"',page)
             self.assertIn('Back to Network Visualiser',page)
+            self.assertIn('data-runtime-base="runtime.php?file=/"',page)
+            self.assertTrue((output/'runtime.php').is_file())
+
+    @unittest.skipUnless(__import__('shutil').which('php'), 'PHP is needed for runtime endpoint regression checks')
+    def test_runtime_endpoint_enforces_auth_and_exact_asset_allowlist(self):
+        import os
+        import shutil
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);web=root/'web';web.mkdir();(web/'runtime').mkdir()
+            (web/'runtime/pyodide.mjs').write_text('export const expected = true;')
+            shutil.copyfile(ROOT/'playground/runtime.php',web/'runtime.php')
+            (root/'auth.php').write_text("<?php function requireVisualiserAuth() { if (getenv('SEMANTICROUTER_RUNTIME_TEST_AUTH') !== 'yes') { http_response_code(403); exit; } }")
+            script="register_shutdown_function(function(){fwrite(STDERR,(string)http_response_code());}); $_GET['file']=$argv[1]; include $argv[2];"
+            def request(name,authenticated):
+                environment={**os.environ,'SEMANTICROUTER_RUNTIME_TEST_AUTH':'yes' if authenticated else 'no'}
+                return subprocess.run(['php','-r',script,name,str(web/'runtime.php')],capture_output=True,text=True,env=environment,check=True)
+            allowed=request('/pyodide.mjs',True)
+            self.assertEqual(allowed.stdout,'export const expected = true;')
+            forbidden=request('/pyodide.mjs',False)
+            self.assertEqual(forbidden.stderr,'403');self.assertEqual(forbidden.stdout,'')
+            traversal=request('/../../auth.php',True)
+            self.assertEqual(traversal.stderr,'404');self.assertEqual(traversal.stdout,'')

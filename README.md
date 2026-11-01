@@ -241,3 +241,7 @@ snapshot. The output must be exactly one directory below the existing visualiser
 `auth.php`. Rebuild after backup updates to refresh the bundled models; the browser
 can also import newer exports directly. Public assets contain only the UI, runtime
 and middleware source. There is no second login or dependency on Sites hosting.
+
+The PHP deployment serves runtime assets through an authenticated allowlisted
+`runtime.php` endpoint with explicit JavaScript and WebAssembly MIME types. This
+avoids dependency on nginx having `.mjs` configured in its global MIME map.

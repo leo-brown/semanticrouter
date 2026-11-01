@@ -2,8 +2,10 @@
    Payloads are data, never Python code. A worker keeps the interface responsive. */
 let ready;
 async function boot() {
-  const {loadPyodide} = await import('./runtime/pyodide.mjs');
-  const py = await loadPyodide({indexURL:new URL('./runtime/',self.location.href).href});
+  const configuredBase = new URL(self.location.href).searchParams.get('runtime') || './runtime/';
+  const runtimeBase = new URL(configuredBase,self.location.href).href;
+  const {loadPyodide} = await import(runtimeBase+'pyodide.mjs');
+  const py = await loadPyodide({indexURL:runtimeBase});
   const response = await fetch('./engine.json');
   if (!response.ok) throw new Error('Unable to load middleware sources');
   const sources = await response.json();

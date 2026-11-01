@@ -8,7 +8,9 @@ const pending = new Map();
 function notify(message,error=false) { const box=$('#notice');box.textContent=message;box.classList.toggle('error',error);box.hidden=!message; }
 function engineStatus(text) { $('#engine-status').textContent=text; }
 function startEngine() {
-  worker = new Worker('./engine-worker.js',{type:'module'});
+  const workerURL = new URL('./engine-worker.js',location.href);
+  if(document.body.dataset.runtimeBase) workerURL.searchParams.set('runtime',document.body.dataset.runtimeBase);
+  worker = new Worker(workerURL,{type:'module'});
   worker.onmessage = ({data}) => {
     if(data.type==='ready') { state.engineReady=true;engineStatus('Python engine ready');renderInspector();runChecks(false);return; }
     if(data.id && pending.has(data.id)) { const {resolve,reject}=pending.get(data.id);pending.delete(data.id);data.ok?resolve(data):reject(new Error(data.error)); }

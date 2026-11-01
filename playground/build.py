@@ -78,12 +78,13 @@ def build(output, config_dir=None, runtime_dir=None, download_runtime=False, sna
         # No operational JSON file is ever written to the web directory.
         guard = "<?php\ndeclare(strict_types=1);\nrequire_once dirname(__DIR__) . '/auth.php';\n"
         page_guard = guard + "if (!visualiserAuthValid()) { header('Location: ../'); exit; }\nheader('Cache-Control: no-store');\n?>\n"
-        html = (output/'index.html').read_text().replace('<body>', '<body data-snapshot-url="data.php">')
+        html = (output/'index.html').read_text().replace('<body>', '<body data-snapshot-url="data.php" data-runtime-base="runtime.php?file=/">')
         html = html.replace('href="./" aria-label="SemanticRouter home"', 'href="../" aria-label="Back to Network Visualiser"')
         (output/'index.php').write_text(page_guard+html)
         encoded = base64.b64encode(json.dumps(data).encode()).decode()
         endpoint = guard + "header('Content-Type: application/json');\nheader('Cache-Control: no-store');\nrequireVisualiserAuth();\necho base64_decode('" + encoded + "');\n"
         (output/'data.php').write_text(endpoint)
+        shutil.copyfile(ROOT/'playground/runtime.php',output/'runtime.php')
         (output/'index.html').unlink()
         if (output/'data.json').exists(): (output/'data.json').unlink()
     else:
