@@ -82,10 +82,39 @@
         </div>
         <div class="view-switch" role="group" aria-label="Workspace view">
           <button id="ide-workbench" class="view-button active" aria-pressed="true">
-            Config workbench
+            <svg
+              class="view-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-13-2 16" />
+            </svg>
+            <span>Config workbench</span>
           </button>
           <button id="ide-overview" class="view-button" aria-pressed="false">
-            Network model
+            <svg
+              class="view-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <rect x="9" y="3" width="6" height="5" rx="1" />
+              <rect x="2" y="16" width="6" height="5" rx="1" />
+              <rect x="16" y="16" width="6" height="5" rx="1" />
+              <path d="M12 8v4M5 16v-4h14v4" />
+            </svg>
+            <span>Network model</span>
           </button>
         </div>
         <div id="notice" class="notice" role="status" hidden></div>
