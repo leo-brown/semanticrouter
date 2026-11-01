@@ -59,7 +59,7 @@ or create synthetic routers directly. `router.to_dict()` serializes the intermed
 model to JSON. Raw commands stay in the vendor adapter; common objects retain source
 file/line references and unresolved-feature diagnostics. Unknown vendor firewall
 predicates are retained as opaque constraints and prevent a match from being treated
-as unconditional. The common model currently has no JSON deserialization CLI.
+as unconditional. Use `semanticrouter.serialization.router_from_dict()` to validate and hydrate typed common objects from JSON.
 
 ## Import and firmware definitions
 
@@ -193,3 +193,39 @@ Reference behavior follows MikroTik's official documentation:
 and [Cisco ACL syntax](https://www.cisco.com/c/en/us/support/docs/security/ios-firewall/23602-confaccesslists.html).
 
 Licensed under MIT.
+
+## Browser playground
+
+The buildless web UI runs the same Python parser, common objects, policy engine and
+exporters inside a dedicated Pyodide Web Worker. There is no ML/API processing and
+no duplicated JavaScript implementation of the network rules. Configs selected or
+pasted into the playground are parsed locally in browser memory. Auditing an edited
+model never reparses its source config. Changes are ephemeral until downloaded.
+
+```sh
+python3 playground/build.py --download-runtime
+python3 -m http.server 8000 --directory playground/dist
+```
+
+Open `http://localhost:8000`. The default build includes only a synthetic fixture.
+For a private deployment with the twelve estate routers, add
+`--config-dir /path/to/net-configs`. This includes semantic snapshots and baseline
+findings, never the raw exports. Keep that generated output private; it still
+contains network topology and addressing. `playground/dist/` is excluded from Git.
+Use `--runtime-dir /path/to/pyodide-core` to build without downloading the runtime.
+The build pins Pyodide 314.0.7 and serves its core assets from the same origin.
+
+Select nodes to inspect firewall, BGP, interfaces, addressing and subscriber
+services. The Experiment tab supports rule/peer toggles, MTU and conntrack changes,
+RADIUS timeout adjustments, and packet/route probes. The JSON tab validates and
+applies direct model edits. Export previews identify unsupported mappings. Edit policy to change canonical pollers, required borders and public prefixes. Reset
+restores the bundled snapshot. A downloaded workspace can be rebuilt with
+`--snapshot /path/to/workspace.json`. Relationship lines show configuration evidence,
+including inferred distribution uplinks; they are not a live topology monitor.
+
+Pyodide is distributed under MPL-2.0 and includes CPython under the PSF license;
+see the unmodified distribution notices. Loading the runtime requires WebAssembly
+and Web Worker support. Files are not uploaded to a backend, and nothing applies
+changes to network devices. Workspace/report downloads may contain network data.
+
+Topology relationship regressions also run with `node --test tests/topology.test.mjs` (Node 22+). Reverse BGP endpoints must match before a relationship is labelled reciprocal.
