@@ -218,7 +218,8 @@ function focusLine(line) {
     lines.slice(0, Math.max(0, line - 1)).join('\n').length + (line > 1 ? 1 : 0);
   editor.focus();
   editor.setSelectionRange(start, start + (lines[line - 1] || '').length);
-  editor.scrollTop = Math.max(0, (line - 5) * 21);
+  const lineHeight = parseFloat(getComputedStyle(editor).lineHeight) || 26.25;
+  editor.scrollTop = Math.max(0, (line - 5) * lineHeight);
 }
 
 /** Re-render only from retained draft state, so selection changes cannot erase edits. */
