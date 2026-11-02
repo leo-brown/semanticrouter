@@ -21,6 +21,10 @@ test('standalone startup, JSON edit and reset work through the real module graph
   const stages = ['rules', 'source', 'model', 'tests', 'export'].map((stage) => ({
     dataset: { stage },
   }));
+  const statuses = ['all', 'pass', 'fail', 'unknown', 'skip'].map((resultStatus) => ({
+    dataset: { resultStatus },
+  }));
+  const resultButtons = new Map();
   const typeOptions = ['field', 'packet', 'peers', 'route', 'expression'].map(
     (testKind) => ({ dataset: { testKind } }),
   );
@@ -36,6 +40,12 @@ test('standalone startup, JSON edit and reset work through the real module graph
         classList: { toggle() {} },
         setAttribute() {},
         focus() {},
+        showModal() {
+          this.open = true;
+        },
+        close() {
+          this.open = false;
+        },
         contains() {
           return false;
         },
@@ -43,6 +53,14 @@ test('standalone startup, JSON edit and reset work through the real module graph
         parentElement: { querySelector: () => ({ textContent: '' }) },
         querySelectorAll(query) {
           if (selector === '#ide-flow' && query === '[data-stage]') return stages;
+          if (selector === '#ide-editor' && query === '[data-result-status]')
+            return statuses;
+          if (selector === '#ide-editor' && query === '[data-result]')
+            return [...this.innerHTML.matchAll(/data-result="(\d+)"/g)].map((match) => {
+              if (!resultButtons.has(match[1]))
+                resultButtons.set(match[1], { dataset: { result: match[1] } });
+              return resultButtons.get(match[1]);
+            });
           if (selector === '#new-rule-options' && query === '[data-test-kind]')
             return typeOptions;
           if (selector === '#rule-files' && query === '[data-rule-file]')
@@ -192,6 +210,26 @@ test('standalone startup, JSON edit and reset work through the real module graph
       true,
       'rule catalog is hidden outside test design',
     );
+    state.ruleResults = ['pass', 'fail', 'unknown', 'skip'].map((status, index) => ({
+      status,
+      device: 'demo',
+      rule_id: 'snmp',
+      rule_name: 'Status ' + status,
+      message: 'Result ' + index,
+      observed: null,
+    }));
+    stages.find((button) => button.dataset.stage === 'tests').onclick();
+    statuses.find((button) => button.dataset.resultStatus === 'fail').onclick();
+    assert.match(element('#ide-editor').innerHTML, /Showing 1 of 4/);
+    assert.match(element('#ide-editor').innerHTML, /data-result="1"/);
+    assert.doesNotMatch(element('#ide-editor').innerHTML, /data-result="0"/);
+    statuses.find((button) => button.dataset.resultStatus === 'fail').onclick();
+    assert.match(element('#ide-editor').innerHTML, /Showing 4 of 4/);
+    statuses.find((button) => button.dataset.resultStatus === 'unknown').onclick();
+    resultButtons.get('2').onclick();
+    assert.equal(JSON.parse(element('#rule-definition').value).id, 'snmp');
+    state.ruleResults = [];
+    (await import('../playground/views.js')).render();
     stages.find((button) => button.dataset.stage === 'export').onclick();
     assert.match(
       element('#ide-editor').innerHTML,
@@ -340,6 +378,20 @@ test('standalone startup, JSON edit and reset work through the real module graph
       'an empty suite cannot save a nonexistent rule',
     );
     assert.match(element('#rule-files').innerHTML, /No tests selected yet/);
+    element('#new-workspace').onclick();
+    element('#workspace-name').value = 'Empty test lab';
+    await element('#workspace-create').onsubmit({ preventDefault() {} });
+    assert.equal(state.workspace.name, 'Empty test lab');
+    assert.equal(state.routers.length, 0);
+    assert.equal(state.rules.length, 0, 'new workspaces inherit no tests');
+    assert.match(element('#inspector-content').innerHTML, /Load configs/);
+    element('#new-rule').onclick();
+    assert.equal(
+      element('#ide-columns').hidden,
+      false,
+      'test design works before loading routers',
+    );
+    assert.match(element('#rule-definition-panel').innerHTML, /Rule definition/);
   } finally {
     Object.assign(globalThis, originals);
   }

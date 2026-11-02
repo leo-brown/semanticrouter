@@ -57,3 +57,30 @@ test('distribution inference is explicitly labelled', () => {
   assert.equal(result.inferred, true);
   assert.equal(result.status, 'inactive');
 });
+
+test('NNI uplinks use whole physical interface labels and switch aliases, with no VLAN duplicates', () => {
+  const nni = {
+    name: 'nni-Y1',
+    role: 'nni',
+    addresses: [],
+    interfaces: [],
+    bgp: { peers: [] },
+  };
+  nni.role = 'nni';
+  nni.interfaces = [
+    { name: 'sfp-sfpplus1-sw-Y1', kind: 'ethernet' },
+    { name: 'service-sw-Y1', kind: 'vlan' },
+  ];
+  const distribution = {
+    name: 'switch-Y1',
+    role: 'switch',
+    addresses: [],
+    interfaces: [],
+    bgp: { peers: [] },
+  };
+  distribution.role = 'switch';
+  const edges = relationships([nni, distribution]);
+  assert.equal(edges.length, 1);
+  assert.equal(edges[0].inferred, true);
+  assert.equal(edges[0].kind, 'configured-uplink');
+});

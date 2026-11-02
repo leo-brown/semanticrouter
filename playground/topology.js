@@ -60,5 +60,34 @@ export function relationships(routers) {
         }
       }),
     );
+  // Handoff uplinks are configuration hints, not BGP sessions or link-state
+  // observations. Match whole device names/aliases on physical/bond interfaces;
+  // VLAN names may repeat uplink labels and must not create additional links.
+  for (const router of routers)
+    for (const iface of router.interfaces) {
+      if (!['ethernet', 'bonding'].includes(iface.kind)) continue;
+      for (const remote of routers) {
+        if (remote.name === router.name || ![router.role, remote.role].includes('nni'))
+          continue;
+        const aliases = [remote.name, remote.name.replace(/^switch-/i, 'sw-')];
+        const label = iface.name.toLowerCase();
+        if (
+          !aliases.some((name) => {
+            const target = name.toLowerCase();
+            return label === target || label.endsWith('-' + target);
+          })
+        )
+          continue;
+        const key = [router.name, remote.name].sort().join('|');
+        if (!edges.has(key))
+          edges.set(key, {
+            a: router.name,
+            b: remote.name,
+            inferred: true,
+            status: 'inactive',
+            kind: 'configured-uplink',
+          });
+      }
+    }
   return [...edges.values()];
 }

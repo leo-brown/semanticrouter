@@ -42,7 +42,7 @@ python3 playground/build.py --download-runtime \
 ```
 
 By default `--config-dir` loads all non-hidden `.cfg`/`.rsc` exports with unique names.
-Use `--inventory examples/brighton.json` to select the twelve estate filenames
+Use `--inventory examples/brighton.json` to select the fourteen estate filenames
 explicitly. Inventory selection does not activate any tests. The output contains
 semantic snapshots, results for saved rules, optional example suites and
 credential-redacted source views with original physical line numbers. Credential-bearing
@@ -117,3 +117,73 @@ dataset, not to the semantic router model itself.
 Refresh after deployment so updated UI and worker sources load together. The source
 manifest `engine.json` bundles the actual Python modules and firmware definitions; there
 is no separately maintained JavaScript policy engine.
+
+## Named workspaces, GitHub teams and Git config sync
+
+The sidebar creates empty workspaces or copies the current models/tests. Save and switch
+between named browser workspaces; file import/export remains available. Rule definitions
+and unfinished editor sessions are scoped to their workspace. Browser storage has a
+quota; a failed save leaves the current work intact. Only saved models/rules enter a
+shared or exported snapshot. Empty workspaces can author tests before importing devices.
+
+PHP deployments include GitHub sign-in and team workspace storage. The default is a
+private SQLite store in a mode-0700 directory under
+`/var/tmp/semanticrouter-<installation hash>/`, outside the web root. Set
+`SEMANTICROUTER_DATA_DIR` to an administrator-managed persistent directory such as
+`/var/lib/semanticrouter` for production retention/backup policy. Alternatively
+configure `SEMANTICROUTER_DB_DSN`, `SEMANTICROUTER_DB_USER` and
+`SEMANTICROUTER_DB_PASSWORD`. SQLite DSNs must point outside the web root. The DB
+account needs permission to create the isolated `semanticrouter_*` tables. No account,
+secret or private database belongs in Git. Back up the selected database as part of the
+host's normal backup process.
+
+Open **Team & login → GitHub sign-in setup** from an existing BF administrator session.
+The screen provides a registration link and exact callback URL, then accepts the OAuth
+Client ID and Client Secret into the private database. For this deployment the callback
+is `https://monitoring.brightonfibre.com/visualiser/semanticrouter/oauth_callback.php`.
+Environment settings `SEMANTICROUTER_GITHUB_CLIENT_ID`,
+`SEMANTICROUTER_GITHUB_CLIENT_SECRET` and `SEMANTICROUTER_GITHUB_CALLBACK_URL` can
+override stored settings. This registration is a one-time action in the GitHub
+organisation; the middleware cannot invent or register those credentials itself.
+
+The
+[GitHub web flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps)
+uses state, PKCE and server-side code exchange. Only `read:user` is requested. Access
+tokens are discarded after verifying `/user`; repository permissions are not requested.
+New users start empty and can create teams. Owners create seven-day, single-use
+invitation links bound to a stable GitHub numeric id, so a username rename cannot grant
+the wrong account membership. Invitation secrets stay in URL fragments until explicit
+sign-in. Workspace reads/writes require membership; revision checks reject stale
+teammate saves.
+
+BF data and original-source endpoints retain their separate BF access guard. Team login
+alone exposes neither. Sharing the current BF model to a team is an explicit save
+action; a redacted shared review is not an original backup for complete export.
+
+**Sync config repository** is pull-and-review only. Choose the repository, ref and
+config directory, preview additions/changes/conflicts/removals, and import selected
+files. Both source and model drift produce conflicts. Deletions and conflicts are
+opt-in. The complete candidate is parsed and audited before applying. Nothing commits or
+pushes to the repo. Private repositories need read-only deploy-key access for the PHP
+service account; `SEMANTICROUTER_GIT_SSH_KEY` selects an installed key. Install the
+verified Git host key in that account's SSH known-hosts file. OAuth identity does not
+supply repo access.
+
+GitHub, GitLab and Bitbucket hosts are enabled by default; administrators can set the
+comma-separated `SEMANTICROUTER_GIT_HOSTS` for another trusted host. Git uses a
+temporary bare repository, no checkout/hooks/submodules, restricted transports, bounded
+processes, and a single concurrent sync. Only UTF-8 `.cfg`, `.rsc` and `.txt` blobs are
+imported; symlinks and hidden files are skipped. Limits are 100 configs, 5 MB each, 10
+MB combined, 100 MB fetched packs and 25 seconds per Git process. PHP needs PDO,
+sessions, cURL and `proc_open`; Git/SSH must be installed on the server.
+
+A standalone team server can be built with:
+
+```sh
+python3 playground/build.py --teams --download-runtime --output /srv/semanticrouter
+```
+
+Set a private database DSN and GitHub OAuth credentials in the PHP service environment.
+An installation administrator may use `SEMANTICROUTER_SETUP_TOKEN` with the
+`X-Semanticrouter-Setup` header for initial setup. Team-only builds publish no bundled
+operational snapshot; configs enter through authenticated workspace imports or Git sync.

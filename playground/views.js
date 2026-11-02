@@ -19,6 +19,7 @@ function render() {
   renderInspector();
   renderFindings();
   actions.renderWorkbench?.();
+  actions.renderWorkspaceControls?.();
 }
 
 /** Render inventory search, selection and priority badges using escaped model names. */
@@ -37,6 +38,7 @@ function renderSidebar() {
           bng: 'SUBSCRIBER GATEWAYS',
           switch: 'DISTRIBUTION',
           sw: 'DISTRIBUTION',
+          nni: 'SERVICE HANDOFFS',
         }[r.role] || 'OTHER NODES';
       const heading =
         label === last ? '' : `<div class="group-label">${esc(label)}</div>`;
@@ -76,13 +78,19 @@ function renderMetrics() {
 function renderMap() {
   const positions = new Map();
   const groups = [
-    state.routers.filter((r) => !['border', 'bng', 'switch', 'sw'].includes(r.role)),
+    state.routers.filter(
+      (r) => !['border', 'bng', 'switch', 'sw', 'nni'].includes(r.role),
+    ),
     state.routers.filter((r) => r.role === 'border'),
     state.routers.filter((r) => r.role === 'bng'),
     state.routers.filter((r) => ['switch', 'sw'].includes(r.role)),
+    state.routers.filter((r) => r.role === 'nni'),
   ];
-  const ys = [14, 37, 62, 87];
-  groups.forEach((routers, row) =>
+  const activeGroups = groups.filter((group) => group.length);
+  const ys = activeGroups.map(
+    (_, index) => 10 + index * (80 / Math.max(1, activeGroups.length - 1)),
+  );
+  activeGroups.forEach((routers, row) =>
     routers.forEach((r, i) =>
       positions.set(r.name, { x: ((i + 1) * 100) / (routers.length + 1), y: ys[row] }),
     ),
@@ -252,7 +260,13 @@ function renderExport() {
  * Direct JSON edits are validated by Python before replacing the previous valid model. */
 function renderInspector() {
   const r = current();
-  if (!r) return;
+  if (!r) {
+    $('#selected-name').textContent = 'No routers yet';
+    $('#selected-role').textContent = 'EMPTY WORKSPACE';
+    $('#inspector-content').innerHTML =
+      '<div class="empty-state">Load configs to inspect your network models.</div>';
+    return;
+  }
   const content = $('#inspector-content');
   // Read the current DOM before replacing it: native toggle events can still be
   // queued when the user immediately selects another node or inspector tab.

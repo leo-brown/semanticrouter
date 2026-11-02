@@ -56,13 +56,13 @@ export**. Active rules are prominent choices inside step 1, with per-rule Run sw
 A fresh workspace has no active rules. Add an optional example suite or create your own;
 importing configs never enables hidden checks. Every assertion, scope, parameter and
 priority is editable. Select a router, edit its source or model, and define reusable
-rules using linked definition, logic and parameter trees. Add typed properties or
-child conditions, reorder lists, and undo/redo draft changes. Each panel has an
-optional JSON mode; incomplete JSON is retained and must be fixed before saving. Rules can assert model fields/collections, ordered
-input-firewall decisions, reciprocal BGP peerings, and route-filter decisions. Scope
-them to roles or named routers. Save a rule to evaluate it against the current models;
-inspect pass, fail, unknown and skipped results with links back to the rule or source
-evidence.
+rules using linked definition, logic and parameter trees. Add typed properties or child
+conditions, reorder lists, and undo/redo draft changes. Each panel has an optional JSON
+mode; incomplete JSON is retained and must be fixed before saving. Rules can assert
+model fields/collections, ordered input-firewall decisions, reciprocal BGP peerings, and
+route-filter decisions. Scope them to roles or named routers. Save a rule to evaluate it
+against the current models; inspect pass, fail, unknown and skipped results with links
+back to the rule or source evidence.
 
 Saved rules persist in this browser. Download a workspace to retain models, rule files,
 policy and attached sources together. Model edits rerun assertions without reparsing
@@ -137,3 +137,8 @@ for build, formatting and release checks. CI exercises supported Python versions
 JavaScript tests, and the installed package outside the source directory.
 
 MIT licensed. The optional Pyodide runtime and CPython retain their own licenses.
+
+The workbench also supports named browser workspaces, GitHub-authenticated teams, shared
+workspaces with revision checks, status filters on test results and review-only Git
+config imports. See
+[team and repository setup](docs/deployment.md#named-workspaces-github-teams-and-git-config-sync).

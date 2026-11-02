@@ -1,6 +1,8 @@
-/** Shared, tab-local semantic workspace. No model is persisted or applied to a device. */
+/** Active semantic workspace. Persistence is explicit; no model is applied to a device. */
 export const clone = (value) => structuredClone(value);
 export const state = {
+  workspace: null,
+  git: null,
   routers: [],
   policy: {},
   findings: [],

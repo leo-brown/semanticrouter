@@ -11,7 +11,9 @@
     "switch-X1",
     "switch-X2",
     "switch-Y1",
-    "switch-Y2"
+    "switch-Y2",
+    "nni-X1",
+    "nni-Y1"
   ],
   "snmp_pollers": ["35.189.90.14"],
   "legacy_snmp_pollers": ["52.56.174.0"],

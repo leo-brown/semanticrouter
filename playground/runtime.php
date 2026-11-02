@@ -4,8 +4,18 @@ declare(strict_types=1);
 
 // Explicit MIME types make the worker portable to nginx installations whose
 // mime.types does not include .mjs. Only official runtime assets may be read.
-require_once dirname(__DIR__) . '/auth.php';
-requireVisualiserAuth();
+if (is_file(__DIR__ . '/server/auth.php')) {
+    require_once __DIR__ . '/server/auth.php';
+    SemanticRouter\integrateVisualiser();
+    $bfAccess = function_exists('visualiserAuthValid') && visualiserAuthValid();
+    if (!$bfAccess && !SemanticRouter\teamSessionValid()) { http_response_code(403); exit; }
+    // Runtime downloads must not hold the session lock while other assets load.
+    if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+} else {
+    // Compatibility for an older minimal Visualiser runtime installation.
+    require_once dirname(__DIR__) . '/auth.php';
+    requireVisualiserAuth();
+}
 
 $types = [
     'pyodide.mjs' => 'application/javascript',

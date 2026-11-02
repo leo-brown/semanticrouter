@@ -12,6 +12,98 @@
     <link rel="stylesheet" href="ide.css" />
   </head>
   <body>
+    <dialog id="workspace-dialog" class="workspace-dialog">
+      <form id="workspace-create">
+        <div class="dialog-heading">
+          <h2>New workspace</h2>
+          <button
+            id="close-workspace"
+            type="button"
+            class="text-button"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+        <label class="field"
+          >Workspace name<input
+            id="workspace-name"
+            maxlength="100"
+            required
+            placeholder="e.g. Network migration lab"
+        /></label>
+        <label class="field"
+          >Start with<select id="workspace-template">
+            <option value="blank">Empty workspace</option>
+            <option value="current">Copy current models and tests</option>
+          </select></label
+        >
+        <p class="helper">Separate configs, tests and changes for each project.</p>
+        <p id="workspace-error" class="error-text" role="status"></p>
+        <button id="create-workspace" type="submit" class="button primary">
+          Create workspace
+        </button>
+      </form>
+    </dialog>
+    <dialog id="repository-dialog" class="workspace-dialog repository-dialog">
+      <div class="dialog-heading">
+        <h2>Sync config repository</h2>
+        <button
+          id="close-repository"
+          type="button"
+          class="text-button"
+          aria-label="Close repository sync"
+        >
+          ×
+        </button>
+      </div>
+      <p class="helper">
+        Pull configs for review. Import selected changes into this workspace. Repository
+        access uses the server's read-only credentials.
+      </p>
+      <form id="repository-form">
+        <label class="field"
+          >Repository URL<input
+            id="repository-url"
+            required
+            placeholder="git@github.com:team/network-configs.git"
+        /></label>
+        <div class="field-row">
+          <label class="field"
+            >Branch or commit<input
+              id="repository-branch"
+              value="HEAD"
+              required /></label
+          ><label class="field"
+            >Config directory<input
+              id="repository-directory"
+              value="net-configs"
+              placeholder="Repository root"
+          /></label>
+        </div>
+        <button id="repository-fetch" class="button">Preview changes</button>
+      </form>
+      <div id="repository-preview"></div>
+      <p id="repository-error" class="error-text" role="status"></p>
+      <button id="repository-apply" class="button primary" hidden>
+        Import selected changes
+      </button>
+    </dialog>
+    <dialog id="team-dialog" class="workspace-dialog team-dialog">
+      <div class="dialog-heading">
+        <h2>Team workspaces</h2>
+        <button
+          id="close-team"
+          type="button"
+          class="text-button"
+          aria-label="Close team settings"
+        >
+          ×
+        </button>
+      </div>
+      <div id="team-content"></div>
+      <p id="team-error" class="error-text" role="status"></p>
+    </dialog>
     <!-- Header: runtime status is distinct from the availability of cached snapshot data. -->
     <header class="topbar">
       <a class="brand" href="./" aria-label="SemanticRouter home"
@@ -32,8 +124,12 @@
       <!-- Inventory and workspace reset/download controls. -->
       <aside class="sidebar">
         <div class="sidebar-title">
-          <span>WORKSPACE</span><span id="device-count">12 nodes</span>
+          <span>WORKSPACE</span><span id="device-count">…</span>
         </div>
+        <label class="workspace-picker"
+          ><span class="sr-only">Current workspace</span
+          ><select id="workspace-select" aria-label="Current workspace"></select
+        ></label>
         <label class="search"
           ><span>⌕</span
           ><input id="search" placeholder="Find a router…" aria-label="Find a router"
@@ -42,12 +138,18 @@
         <div class="sidebar-footer">
           <span class="eyebrow">PROJECT</span>
           <p>
-            Rule files are retained in this browser.<br />Download a workspace to keep
-            model and source edits.
+            <span id="workspace-location">Saved in this browser</span>. Save models and
+            rules here, or export a file.
           </p>
+          <button id="new-workspace" class="text-button">＋ New workspace</button>
+          <button id="save-workspace" class="text-button">▣ Save workspace</button>
+          <button id="team-access" class="text-button">♧ Team &amp; login</button>
+          <button id="repo-sync" class="text-button">⤓ Sync config repository</button>
           <button id="reset-all" class="text-button">↶ Reset workspace</button
-          ><button id="download-workspace" class="text-button">↓ Save workspace</button
-          ><button id="open-workspace" class="text-button">↥ Open workspace</button
+          ><button id="download-workspace" class="text-button">
+            ↓ Export workspace file</button
+          ><button id="open-workspace" class="text-button">
+            ↥ Import workspace file</button
           ><input id="workspace-input" type="file" accept=".json" hidden /><span
             id="snapshot-mode"
           ></span>

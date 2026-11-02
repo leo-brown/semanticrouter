@@ -941,3 +941,140 @@ body:not(.network-overview) .metrics strong {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Result totals act as real keyboard-operable toggle buttons. */
+.status-filters button {
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+.status-filters button[aria-pressed='true'] {
+  border-color: currentColor;
+  box-shadow: 0 0 0 2px #fff inset;
+}
+.status-filters button:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 3px;
+}
+.test-status.all {
+  background: #e7eeec;
+  color: #405d54;
+}
+
+.workspace-picker {
+  display: block;
+  margin: 0.5rem 0.6rem;
+}
+.workspace-picker select {
+  width: 100%;
+  padding: 0.55rem 0.4rem;
+  font-size: 0.72rem;
+  border: 1px solid #ccdcd5;
+  border-radius: 0.35rem;
+  background: white;
+}
+.workspace-dialog {
+  width: min(28rem, 90vw);
+  padding: 1.3rem;
+  border: 1px solid #c8d9d2;
+  border-radius: 0.75rem;
+  color: var(--ink);
+}
+.workspace-dialog::backdrop {
+  background: #142b2580;
+}
+.dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.dialog-heading h2 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.team-dialog {
+  width: min(34rem, 92vw);
+}
+.team-dialog details {
+  margin: 1rem 0;
+}
+.team-dialog form {
+  margin: 0.8rem 0 1rem;
+}
+.team-workspace {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  padding: 0.6rem;
+  margin: 0.3rem 0;
+  border: 1px solid #ccdcd5;
+  border-radius: 0.4rem;
+  background: #f5f9f7;
+  text-align: left;
+}
+.team-workspace small {
+  color: var(--muted);
+  margin-left: 1rem;
+}
+.login-page {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  background: #eef4f1;
+}
+.login-card {
+  width: min(24rem, 90vw);
+  padding: 2rem;
+  background: white;
+  border: 1px solid #d4e1db;
+  border-radius: 0.8rem;
+}
+.login-card h1 {
+  margin: 1.4rem 0 0.5rem;
+  font-size: 1.5rem;
+}
+.login-card p {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.repository-dialog {
+  width: min(40rem, 94vw);
+}
+.repository-files {
+  max-height: 42dvh;
+  overflow-y: auto;
+  margin: 0.8rem 0;
+}
+.repository-file {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid #deebe5;
+  font-size: 0.72rem;
+}
+.repository-file input {
+  width: auto;
+}
+.repository-file small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.6rem;
+}
+.repository-status {
+  margin-left: auto;
+  color: #47635a;
+}
+.repository-status.conflict,
+.repository-status.removed {
+  color: #b66b35;
+}

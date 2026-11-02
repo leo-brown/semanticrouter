@@ -7,6 +7,13 @@ import { state, clone, current } from './state.js';
 import { $, esc, notify, download, engineStatus } from './dom.js';
 import { startEngine, callEngine, exportModel } from './engine.js';
 import {
+  initializeWorkspaces,
+  renderWorkspaceControls,
+  workspaceController,
+} from './workspaces.js';
+import { initializeTeams } from './teams.js';
+import { initializeRepository } from './repository.js';
+import {
   configureViews,
   render,
   renderSidebar,
@@ -23,6 +30,10 @@ import {
   resetWorkbench,
   refreshTests,
   workflowSnapshot,
+  captureWorkbenchDrafts,
+  restoreWorkbenchDrafts,
+  pendingConfigDraftNames,
+  discardConfigDrafts,
 } from './workbench.js';
 
 /** Change inspector focus and clear stale export output; the semantic models stay untouched. */
@@ -293,12 +304,63 @@ async function main() {
     state.findings = clone(data.findings);
     state.originals = new Map(state.routers.map((r) => [r.name, clone(r)]));
     state.selected =
-      state.routers.find((r) => r.name === 'bng-X1')?.name || state.routers[0].name;
+      state.routers.find((r) => r.name === 'bng-X1')?.name ||
+      state.routers[0]?.name ||
+      null;
     $('#snapshot-mode').textContent = data.mode;
-    initializeWorkbench(data, { runChecks, render, select });
+    const workspaceCallbacks = { runChecks, render, select };
+    const controller = initializeWorkspaces(data, {
+      snapshot: () => ({
+        routers: clone(state.routers),
+        policy: clone(state.policy),
+        ...clone(workflowSnapshot()),
+        rule_suites: clone(state.ruleSuites),
+      }),
+      validate: (snapshot) =>
+        callEngine('audit', {
+          routers: snapshot.routers,
+          policy: snapshot.policy || {},
+          rules: snapshot.rules || [],
+        }),
+      captureDrafts: captureWorkbenchDrafts,
+      restoreDrafts: restoreWorkbenchDrafts,
+      render,
+      async apply(snapshot, baseline, metadata) {
+        state.workspace = metadata;
+        state.baseline = clone(baseline);
+        state.routers = clone(snapshot.routers);
+        state.policy = clone(snapshot.policy || {});
+        state.findings = [];
+        state.originals = new Map(
+          baseline.routers.map((router) => [router.name, clone(router)]),
+        );
+        state.selected =
+          state.routers.find((router) => router.name === snapshot.selected)?.name ||
+          state.routers[0]?.name ||
+          null;
+        state.modified = new Set(snapshot.modified || []);
+        state.policyModified = false;
+        state.exportResult = null;
+        state.revision++;
+        initializeWorkbench(snapshot, workspaceCallbacks, { restoreRules: false });
+        $('#snapshot-mode').textContent = metadata.name;
+        await runChecks(false);
+      },
+    });
+    initializeTeams(controller);
+    initializeRepository(controller, {
+      pendingNames: pendingConfigDraftNames,
+      discardDrafts: discardConfigDrafts,
+    });
+    initializeWorkbench(data, workspaceCallbacks);
     render();
     startEngine(
-      () => {
+      async () => {
+        try {
+          await controller.restoreActive();
+        } catch (error) {
+          notify('Saved workspace could not be opened: ' + error.message, true);
+        }
         renderInspector();
         runChecks(false);
       },
@@ -344,6 +406,7 @@ configureViews({
   bindExport,
   bindModel,
   renderWorkbench,
+  renderWorkspaceControls,
   openEvidence,
 });
 
@@ -394,18 +457,21 @@ $('#reset-all').onclick = async () => {
   state.modified.clear();
   state.policyModified = false;
   state.revision++;
-  if (!current()) state.selected = state.routers[0].name;
+  if (!current()) state.selected = state.routers[0]?.name || null;
   resetWorkbench();
   render();
   if (state.engineReady) await runChecks(false);
   notify('Workspace restored to the bundled snapshot.');
 };
 $('#download-workspace').onclick = () =>
-  download('semanticrouter-workspace.json', {
-    routers: state.routers,
-    policy: state.policy,
-    ...workflowSnapshot(),
-  });
+  download(
+    'semanticrouter-workspace.json',
+    workspaceController()?.capture() || {
+      routers: state.routers,
+      policy: state.policy,
+      ...workflowSnapshot(),
+    },
+  );
 $('#download-report').onclick = () =>
   download('semanticrouter-report.json', {
     kind: 'configuration-only',

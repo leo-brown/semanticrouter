@@ -6,6 +6,7 @@ import { state, clone, current } from './state.js';
 import { $, esc, notify, download } from './dom.js';
 import { callEngine, exportModel } from './engine.js';
 import { TreeDocument, mountTreeEditor } from './tree-editor.js';
+import { workspaceController } from './workspaces.js';
 
 let hooks;
 const drafts = new Map(),
@@ -175,7 +176,7 @@ function template(kind) {
 }
 function persistRules() {
   try {
-    localStorage.setItem('semanticrouter-rule-files-v1', JSON.stringify(state.rules));
+    localStorage.setItem(ruleStorageKey(), JSON.stringify(state.rules));
   } catch {
     notify(
       'Rules are saved in this tab. Browser storage is unavailable; download the workspace to retain them.',
@@ -220,8 +221,48 @@ function button(text, id, primary = false, disabled = false) {
   return `<button id="${id}" class="button ${primary ? 'primary' : ''}" ${disabled ? 'disabled' : ''}>${text}</button>`;
 }
 
+/** Preserve unfinished editors within a workspace without serializing them as saved
+ * rules or sharing raw draft expressions. Maps hold document instances deliberately. */
+export function pendingConfigDraftNames() {
+  return new Set([...sourceDrafts.keys(), ...modelDrafts.keys()]);
+}
+export function discardConfigDrafts(names) {
+  for (const name of names) {
+    sourceDrafts.delete(name);
+    modelDrafts.delete(name);
+  }
+}
+export function captureWorkbenchDrafts() {
+  return {
+    drafts: new Map(drafts),
+    newRules: new Map(newRules),
+    ruleDocuments: new Map(ruleDocuments),
+    sourceDrafts: new Map(sourceDrafts),
+    modelDrafts: new Map(modelDrafts),
+  };
+}
+export function restoreWorkbenchDrafts(session) {
+  destroyRuleViews();
+  for (const [key, target] of Object.entries({
+    drafts,
+    newRules,
+    ruleDocuments,
+    sourceDrafts,
+    modelDrafts,
+  })) {
+    target.clear();
+    if (session?.[key]) for (const [id, value] of session[key]) target.set(id, value);
+  }
+  selectedRule = null;
+  resultStatus = 'all';
+}
+const ruleStorageKey = () =>
+  !state.workspace || state.workspace.id === 'bf-network'
+    ? 'semanticrouter-rule-files-v1'
+    : 'semanticrouter-rule-files-v1:' + state.workspace.id;
+
 /** Wire the IDE to application actions without importing its mutable event layer. */
-export function initializeWorkbench(data, callbacks) {
+export function initializeWorkbench(data, callbacks, { restoreRules = true } = {}) {
   hooks = callbacks;
   state.rules = clone(data.rules || []);
   state.ruleResults = clone(data.rule_results || []);
@@ -238,7 +279,7 @@ export function initializeWorkbench(data, callbacks) {
   state.ruleSuites = clone(data.rule_suites || []);
   try {
     const retained = JSON.parse(
-      localStorage.getItem('semanticrouter-rule-files-v1') || 'null',
+      (restoreRules ? localStorage.getItem(ruleStorageKey()) : null) || 'null',
     );
     if (
       Array.isArray(retained) &&
@@ -318,8 +359,13 @@ export function initializeWorkbench(data, callbacks) {
       if (file.size > 10 * 1024 * 1024)
         throw new Error('Workspace is larger than 10 MB.');
       const candidate = JSON.parse(await file.text());
-      if (!Array.isArray(candidate.routers) || !candidate.routers.length)
-        throw new Error('Workspace needs at least one router.');
+      if (workspaceController()) {
+        await workspaceController().importSnapshot(candidate);
+        notify('Workspace imported.');
+        return;
+      }
+      if (!Array.isArray(candidate.routers))
+        throw new Error('Workspace needs a router array.');
       if (
         candidate.sources &&
         (typeof candidate.sources !== 'object' ||
@@ -341,7 +387,7 @@ export function initializeWorkbench(data, callbacks) {
       state.nativeSources = {};
       state.findings = result.findings;
       state.ruleResults = result.rule_results || [];
-      state.selected = state.routers[0].name;
+      state.selected = state.routers[0]?.name || null;
       state.modified = new Set(state.routers.map((r) => r.name));
       state.revision++;
       drafts.clear();
@@ -411,7 +457,7 @@ function focusLine(line) {
 
 /** Re-render only from retained draft state, so selection changes cannot erase edits. */
 export function renderWorkbench() {
-  if (!hooks || !current()) return;
+  if (!hooks) return;
   document.body.classList.toggle('network-overview', overview);
   for (const [id, active] of [
     ['ide-workbench', !overview],
@@ -512,12 +558,12 @@ export function renderWorkbench() {
         : 'rules/'
       : stage === 'tests'
         ? 'tests/results'
-        : current().name +
+        : (current()?.name || 'workspace') +
           (stage === 'source' ? '.cfg' : stage === 'model' ? '.model.json' : '.export');
   $('#ide-status').textContent =
     (state.engineReady ? 'Python ready' : 'Python loading') +
     ' · ' +
-    current().name +
+    (current()?.name || 'No router selected') +
     ' · ' +
     state.modified.size +
     ' changed models';
@@ -529,11 +575,14 @@ export function renderWorkbench() {
   $('#close-rule-editor').hidden = stage !== 'rules' || !showEditor;
   destroyRuleViews();
   const content = $('#ide-editor');
-  if (stage === 'source') renderSource(content);
-  if (stage === 'model') renderModel(content);
+  if (stage === 'source' && current()) renderSource(content);
+  if (stage === 'model' && current()) renderModel(content);
   if (stage === 'rules' && showEditor) renderRule(content);
   if (stage === 'tests') renderTests(content);
-  if (stage === 'export') renderExport(content);
+  if (stage === 'export' && current()) renderExport(content);
+  if (!current() && ['source', 'model', 'export'].includes(stage))
+    content.innerHTML =
+      '<div class="empty-state"><h2>Load your first configuration</h2><p>Use Load config to add a router to this workspace. You can design tests before loading devices.</p></div>';
   renderContext();
   $('#ide-primary').onclick = () => {
     if (stage === 'source') return parseSource();
@@ -543,7 +592,9 @@ export function renderWorkbench() {
     else $('#ide-export-form')?.requestSubmit();
   };
   $('#ide-primary').disabled =
-    !state.engineReady || (stage === 'rules' && !savedRule());
+    !state.engineReady ||
+    (stage === 'rules' && !savedRule()) ||
+    (!current() && ['source', 'model', 'export'].includes(stage));
   $('#ide-primary').textContent = {
     source: 'Parse → model',
     model: 'Apply → run tests',
@@ -794,24 +845,44 @@ async function saveRule() {
     $('#ide-error').textContent = error.message;
   }
 }
+/** Status totals are independent filters; clicking an active total restores All.
+ * Keep original result indices so filtering never opens the wrong rule/router. */
+let resultStatus = 'all';
 function renderTests(content) {
   const results = state.ruleResults || [],
     counts = totals(results);
-  content.innerHTML = `<div class="stage-intro"><h2>Test the intended configuration</h2><p>These are the results of your saved rule files. Click a result to open its definition and router context.</p></div><div class="test-totals">${['pass', 'fail', 'unknown', 'skip'].map((status) => `<span class="test-status ${status}">${counts[status]} ${status}</span>`).join('')}</div><div class="rule-results"><table><thead><tr><th>Result</th><th>Rule / router</th><th>Observed result</th></tr></thead><tbody>${results.map((result, index) => `<tr><td><span class="test-status ${result.status}">${result.status.toUpperCase()}</span></td><td><button data-result="${index}" class="text-button">${esc(result.rule_name)}<br><small>${esc(result.device)}</small></button></td><td>${esc(result.message)}${result.observed !== null ? `<pre>${esc(JSON.stringify(result.observed))}</pre>` : ''}</td></tr>`).join('') || '<tr><td colspan="3">Create a rule and run it to see pass/fail results here.</td></tr>'}</tbody></table></div>`;
-  content.querySelectorAll('[data-result]').forEach(
-    (b) =>
-      (b.onclick = () => {
-        const r = results[Number(b.dataset.result)];
-        state.selected = r.device;
-        selectedRule = r.rule_id;
-        stage = 'rules';
-        hooks.render();
-      }),
-  );
+  const visible = results
+    .map((result, index) => ({ result, index }))
+    .filter(({ result }) => resultStatus === 'all' || result.status === resultStatus);
+  content.innerHTML = `<div class="stage-intro"><h2>Test the intended configuration</h2><p>Filter by result, then open a test to inspect its definition and router context.</p></div><div class="test-totals status-filters" role="group" aria-label="Filter test results">${['all', 'pass', 'fail', 'unknown', 'skip'].map((status) => `<button type="button" data-result-status="${status}" class="test-status ${status}" aria-pressed="${resultStatus === status}">${status === 'all' ? results.length : counts[status]} ${status}</button>`).join('')}</div><p class="helper" role="status">Showing ${visible.length} of ${results.length} results${resultStatus === 'all' ? '' : ' · ' + resultStatus}</p><div class="rule-results"><table><thead><tr><th>Result</th><th>Rule / router</th><th>Observed result</th></tr></thead><tbody>${visible.map(({ result, index }) => `<tr><td><span class="test-status ${result.status}">${result.status.toUpperCase()}</span></td><td><button data-result="${index}" class="text-button">${esc(result.rule_name)}<br><small>${esc(result.device)}</small></button></td><td>${esc(result.message)}${result.observed != null ? `<pre>${esc(JSON.stringify(result.observed))}</pre>` : ''}</td></tr>`).join('') || '<tr><td colspan="3">No results match this status.</td></tr>'}</tbody></table></div>`;
+  content.querySelectorAll('[data-result-status]').forEach((button) => {
+    button.onclick = () => {
+      resultStatus =
+        resultStatus === button.dataset.resultStatus
+          ? 'all'
+          : button.dataset.resultStatus;
+      renderTests(content);
+    };
+  });
+  content.querySelectorAll('[data-result]').forEach((button) => {
+    button.onclick = () => {
+      const result = results[Number(button.dataset.result)];
+      state.selected = result.device;
+      selectedRule = result.rule_id;
+      stage = 'rules';
+      hooks.render();
+    };
+  });
 }
+
 function renderContext() {
-  const r = current(),
-    results = (state.ruleResults || []).filter(
+  const r = current();
+  if (!r) {
+    $('#ide-context').innerHTML =
+      '<h3>New workspace</h3><p class="helper">Create tests, then load router configs to begin.</p>';
+    return;
+  }
+  const results = (state.ruleResults || []).filter(
       (result) => result.device === r.name && result.status !== 'skip',
     ),
     counts = totals(results);
@@ -937,6 +1008,7 @@ export function workflowSnapshot() {
     sources: state.sources,
     source_redacted: state.sourceRedacted,
     source_hashes: state.sourceHashes,
+    source_url: state.sourceURL,
     rules: state.rules,
   };
 }

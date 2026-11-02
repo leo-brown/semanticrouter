@@ -164,6 +164,18 @@ class VisualiserDeploymentTests(unittest.TestCase):
                 (output / "tree-editor.js").read_bytes(),
                 (ROOT / "playground/tree-editor.js").read_bytes(),
             )
+            for asset in (
+                "workspaces.js",
+                "teams.js",
+                "team-client.js",
+                "repository.js",
+                "github-setup.js",
+                "oauth_callback.php",
+                "api.php",
+                "server/github.php",
+                "server/git.php",
+            ):
+                self.assertTrue((output / asset).is_file(), asset)
             self.assertFalse((output / "data.json").exists())
             self.assertFalse((output / "index.html").exists())
             endpoint = (output / "data.php").read_text()
@@ -180,6 +192,12 @@ class VisualiserDeploymentTests(unittest.TestCase):
             self.assertIn("Back to Network Visualiser", page)
             self.assertIn('data-runtime-base="runtime.php?file=/"', page)
             self.assertTrue((output / "runtime.php").is_file())
+            standalone = root / "team-web"
+            with contextlib.redirect_stdout(io.StringIO()):
+                builder.build(standalone, runtime_dir=runtime, teams=True)
+            self.assertTrue((standalone / "index.php").is_file())
+            for filename in ("index.html", "data.json", "data.php", "source.php"):
+                self.assertFalse((standalone / filename).exists())
 
     @unittest.skipUnless(
         __import__("shutil").which("php"),

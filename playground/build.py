@@ -28,6 +28,7 @@ def build(
     snapshot=None,
     visualiser=False,
     inventory=None,
+    teams=False,
 ):
     """Create a standalone static playground or an optional authenticated PHP bundle.
 
@@ -38,6 +39,10 @@ def build(
 
     The output directory is generated content and may be rebuilt. Do not point it at
     a directory containing hand-maintained source files."""
+    if teams and not visualiser and (config_dir or snapshot):
+        raise ValueError(
+            "Team-only deployments import configs after login. Use --visualiser for the protected BF snapshot."
+        )
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     for name in (
@@ -51,10 +56,20 @@ def build(
         "engine.js",
         "views.js",
         "workbench.js",
+        "workspaces.js",
+        "team-client.js",
+        "teams.js",
+        "repository.js",
+        "login.js",
+        "github-setup.js",
+        "oauth_callback.php",
+        "login.php",
+        "api.php",
         "tree-editor.js",
         "ide.css",
     ):
         shutil.copyfile(ROOT / "playground" / name, output / name)
+    shutil.copytree(ROOT / "playground/server", output / "server", dirs_exist_ok=True)
     runtime = output / "runtime"
     runtime.mkdir(exist_ok=True)
     assets = (
@@ -241,19 +256,22 @@ def build(
         guard = "<?php\ndeclare(strict_types=1);\nrequire_once dirname(__DIR__) . '/auth.php';\n"
         page_guard = (
             guard
-            + "if (!visualiserAuthValid()) { header('Location: ../'); exit; }\nheader('Cache-Control: no-store');\n?>\n"
+            + "require_once __DIR__ . '/server/auth.php';\n"
+            + "$bfAccess = visualiserAuthValid();\n"
+            + "if (!$bfAccess && !SemanticRouter\\teamSessionValid()) { header('Location: login.php'); exit; }\n"
+            + "header('Cache-Control: no-store');\n?>\n"
         )
         html = (
             (output / "index.html")
             .read_text()
             .replace(
                 "<body>",
-                '<body data-snapshot-url="data.php" data-runtime-base="runtime.php?file=/">',
+                """<?php if ($bfAccess): ?><body data-team-api="api.php" data-snapshot-url="data.php" data-runtime-base="runtime.php?file=/"><?php else: ?><body data-team-api="api.php" data-snapshot-url="api.php?action=bootstrap" data-runtime-base="runtime.php?file=/"><?php endif; ?>""",
             )
         )
         html = html.replace(
             'href="./" aria-label="SemanticRouter home"',
-            'href="../" aria-label="Back to Network Visualiser"',
+            '''href="<?php echo $bfAccess ? '../' : './'; ?>" aria-label="<?php echo $bfAccess ? 'Back to Network Visualiser' : 'SemanticRouter home'; ?>"''',
         )
         (output / "index.php").write_text(page_guard + html)
         encoded = base64.b64encode(json.dumps(data).encode()).decode()
@@ -292,6 +310,20 @@ def build(
             (output / "data.json").unlink()
     else:
         (output / "data.json").write_text(json.dumps(data))
+    if teams and not visualiser:
+        page = (
+            (ROOT / "playground/index.html")
+            .read_text()
+            .replace(
+                "<body>",
+                '<body data-team-api="api.php" data-snapshot-url="api.php?action=bootstrap" data-runtime-base="runtime.php?file=/">',
+            )
+        )
+        guard = "<?php\ndeclare(strict_types=1);\nrequire_once __DIR__ . '/server/auth.php';\nif (!SemanticRouter\\teamSessionValid()) { header('Location: login.php'); exit; }\nheader('Cache-Control: no-store');\n?>\n"
+        (output / "index.php").write_text(guard + page)
+        shutil.copyfile(ROOT / "playground/runtime.php", output / "runtime.php")
+        for name in ("index.html", "data.json", "data.php", "source.php"):
+            (output / name).unlink(missing_ok=True)
     print(
         f"Built {len(routers)} semantic snapshots ({mode}) in {output}. Credential-redacted source views included."
     )
@@ -326,6 +358,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Build PHP-authenticated deployment inside visualiser/semanticrouter/",
     )
+    parser.add_argument(
+        "--teams",
+        action="store_true",
+        help="Build a standalone PHP team workbench; configs are imported after login",
+    )
     args = parser.parse_args()
     if args.snapshot and args.config_dir:
         parser.error("Choose either --snapshot or --config-dir")
@@ -337,4 +374,5 @@ if __name__ == "__main__":
         args.snapshot,
         args.visualiser,
         args.inventory,
+        args.teams,
     )

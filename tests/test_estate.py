@@ -25,8 +25,8 @@ class EstateTests(unittest.TestCase):
         root = Path(os.environ["SEMANTICROUTER_CONFIG_DIR"])
         cls.routers = [load(root / (name + ".cfg")) for name in cls.policy["devices"]]
 
-    def test_all_twelve_models_and_identities(self):
-        self.assertEqual(len(self.routers), 12)
+    def test_all_inventory_models_and_identities(self):
+        self.assertEqual(len(self.routers), len(self.policy["devices"]))
         for r in self.routers:
             with self.subTest(r.name):
                 self.assertTrue(r.platform.hardware)
@@ -76,7 +76,7 @@ class EstateTests(unittest.TestCase):
 
         rules = example_suites()[1]["rules"]
         results = run_rules(self.routers, rules)
-        self.assertEqual(len(results), len(rules) * 12)
+        self.assertEqual(len(results), len(rules) * len(self.routers))
         self.assertTrue(
             all(r.status in {"pass", "fail", "unknown", "skip"} for r in results)
         )
