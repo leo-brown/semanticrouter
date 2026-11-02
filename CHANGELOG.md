@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Complete source-aware RouterOS exports preserve native features and private settings.
+- Full exports verify original/model/generated/re-imported round trips and native
+  coverage.
+- Authenticated, snapshot-pinned access to originals without placing credentials in
+  model JSON.
+- Original-syntax export default and explicit RouterOS 7.20 BGP layout compatibility
+  checks.
+- Host-route network fields and bounded multi-condition route predicates round-trip
+  correctly.
+
 - No implicit network policy: new workspaces start with no active rules.
 - Test design promoted to the main workspace, with explicit per-rule Run choices.
 - All 29 former estate checks moved into optional, fully editable example suites.

@@ -22,9 +22,15 @@ def detect(text, paths, version=None):
     contradict recognizable syntax. Mixed family markers are rejected rather than
     selecting whichever happened to appear first."""
     header = re.search(r"^#.*\bby RouterOS\s+([0-9][\w.\-]+)", text, re.M)
+    generated = re.search(
+        r"^# SemanticRouter complete RouterOS export; target=(7\.\d+(?:\.\d+)?)$",
+        text,
+        re.M,
+    )
     model = re.search(r"^#\s*model\s*=\s*(.+)$", text, re.M)
     p = Platform(
-        version=version or (header.group(1) if header else None),
+        version=version
+        or (generated.group(1) if generated else header.group(1) if header else None),
         hardware=model.group(1).strip() if model else None,
     )
     if p.version:

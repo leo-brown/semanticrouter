@@ -4,7 +4,7 @@
  */
 import { state, clone, current } from './state.js';
 import { $, esc, notify, download } from './dom.js';
-import { callEngine } from './engine.js';
+import { callEngine, exportModel } from './engine.js';
 
 let hooks;
 const drafts = new Map(),
@@ -209,9 +209,15 @@ export function initializeWorkbench(data, callbacks) {
   state.rules = clone(data.rules || []);
   state.ruleResults = clone(data.rule_results || []);
   state.sources = clone(data.sources || {});
-  state.sourceRedacted = Object.fromEntries(
-    Object.keys(state.sources).map((name) => [name, !!data.sources_redacted]),
+  state.sourceRedacted = clone(
+    data.source_redacted ||
+      Object.fromEntries(
+        Object.keys(state.sources).map((name) => [name, !!data.sources_redacted]),
+      ),
   );
+  state.nativeSources = {};
+  state.sourceHashes = clone(data.source_hashes || {});
+  state.sourceURL = data.source_url || null;
   state.ruleSuites = clone(data.rule_suites || []);
   try {
     const retained = JSON.parse(
@@ -314,6 +320,8 @@ export function initializeWorkbench(data, callbacks) {
       state.rules = clone(candidate.rules || []);
       state.sources = clone(candidate.sources || {});
       state.sourceRedacted = clone(candidate.source_redacted || {});
+      state.sourceHashes = clone(candidate.source_hashes || {});
+      state.nativeSources = {};
       state.findings = result.findings;
       state.ruleResults = result.rule_results || [];
       state.selected = state.routers[0].name;
@@ -891,21 +899,28 @@ function changes(router) {
 }
 function renderExport(content) {
   const r = current();
-  content.innerHTML = `<div class="stage-intro"><h2>Review the config output</h2><p>Render this model for a target platform. The output is a review artifact; it is never applied to a device.</p></div><form id="ide-export-form"><div class="field-row"><label class="field">Vendor<select id="ide-vendor"><option value="routeros">RouterOS</option><option value="cisco-ios">Cisco IOS ACL</option></select></label>${input('Target version', 'ide-version', '7.19.3')}</div><label class="toggle-row">Allow a clearly labelled partial fragment<input id="ide-partial" type="checkbox" checked></label></form><div id="ide-export-result" role="status"></div><details class="conversion-gaps"><summary>${r.unexported.length} source statements need export mappings</summary><p class="helper">These statements block a complete conversion. Open a line to inspect the source, then load an original export or extend its vendor mapping.</p>${r.unexported.map((source) => `<button class="gap-line" data-gap="${source.line}">${esc(source.path.split('/').pop())}:${source.line}<code>${esc((state.sources[r.name] || '').split('\n')[source.line - 1] || 'Source text not attached — load the export to inspect this statement')}</code></button>`).join('')}</details><div id="ide-error" class="error-text" role="status"></div>`;
-  $('#ide-vendor').onchange = () =>
-    ($('#ide-version').value =
-      $('#ide-vendor').value === 'routeros' ? '7.19.3' : '15.2');
+  content.innerHTML = `<div class="stage-intro"><h2>Review the config output</h2><p>Render this model for a target platform. The output is a review artifact; it is never applied to a device.</p></div><form id="ide-export-form"><div class="field-row"><label class="field">Vendor<select id="ide-vendor"><option value="routeros">RouterOS</option><option value="cisco-ios">Cisco IOS ACL</option></select></label>${input('Target version', 'ide-version', 'source', 'source keeps the original RouterOS syntax')}</div><label id="ide-partial-option" class="toggle-row" hidden>Allow a clearly labelled conversion fragment<input id="ide-partial" type="checkbox"></label></form><div id="ide-export-result" role="status"></div><details class="conversion-gaps"><summary>${r.unexported.length} statements outside semantic translation coverage</summary><p class="helper">These statements are retained in a complete RouterOS export. Translating them to another platform needs semantic mappings.</p>${r.unexported.map((source) => `<button class="gap-line" data-gap="${source.line}">${esc(source.path.split('/').pop())}:${source.line}<code>${esc((state.sources[r.name] || '').split('\n')[source.line - 1] || 'Source text not attached — load the export to inspect this statement')}</code></button>`).join('')}</details><div id="ide-error" class="error-text" role="status"></div>`;
+  $('#ide-vendor').onchange = () => {
+    $('#ide-version').value = $('#ide-vendor').value === 'routeros' ? 'source' : '15.2';
+    $('#ide-partial-option').hidden = $('#ide-vendor').value === 'routeros';
+    $('#ide-partial').checked = false;
+  };
   $('#ide-export-form').onsubmit = async (event) => {
     event.preventDefault();
     try {
       const vendor = $('#ide-vendor').value;
-      const result = await callEngine('export', {
+      const result = await exportModel({
         vendor,
         version: $('#ide-version').value.trim(),
         partial: $('#ide-partial').checked,
       });
+      const proof = result.verification || {};
+      const verified = proof.semantic_match
+        ? `<div class="test-totals"><span class="test-status pass">Model round trip matched</span>${proof.native_statement_match ? '<span class="test-status pass">Native statement coverage matched</span>' : ''}</div>${proof.input_statements !== undefined ? `<p class="helper">${proof.input_statements} input statements · ${proof.output_statements} generated statements</p>` : ''}`
+        : '';
       $('#ide-export-result').innerHTML =
-        `<p class="export-state">${result.complete ? 'Supported model coverage complete' : 'Partial output — review the omitted statements below'}</p><pre class="result-box">${esc(result.text)}</pre><div class="error-text">${result.diagnostics.map(esc).join('\n')}</div>${button('Download reviewed output', 'ide-download-export')}`;
+        verified +
+        `<p class="export-state">${result.complete ? (result.mode === 'source-aware' ? 'Complete RouterOS configuration — model and native statements verified' : 'Complete supported model conversion') : 'Partial output — review the omitted statements below'}</p><pre class="result-box">${esc(result.text)}</pre><div class="error-text">${result.diagnostics.map(esc).join('\n')}</div>${button('Download configuration', 'ide-download-export')}`;
       $('#ide-download-export').onclick = () =>
         download(r.name + (vendor === 'routeros' ? '.rsc' : '.ios'), result.text);
     } catch (error) {
@@ -929,15 +944,26 @@ export function resetWorkbench() {
   sourceDrafts.clear();
   modelDrafts.clear();
   state.sources = clone(state.baseline.sources || {});
-  state.sourceRedacted = Object.fromEntries(
-    Object.keys(state.sources).map((name) => [name, !!state.baseline.sources_redacted]),
+  state.sourceRedacted = clone(
+    state.baseline.source_redacted ||
+      Object.fromEntries(
+        Object.keys(state.sources).map((name) => [
+          name,
+          !!state.baseline.sources_redacted,
+        ]),
+      ),
   );
+  state.sourceHashes = clone(state.baseline.source_hashes || {});
+  state.sourceURL = state.baseline.source_url || null;
+  state.nativeSources = {};
   state.ruleResults = [];
   renderWorkbench();
 }
 export function attachSource(name, text, redacted = false) {
   state.sources[name] = text;
   state.sourceRedacted[name] = redacted;
+  state.nativeSources = {};
+  delete state.sourceHashes[name];
   sourceDrafts.delete(name);
 }
 export function refreshTests() {
@@ -947,6 +973,7 @@ export function workflowSnapshot() {
   return {
     sources: state.sources,
     source_redacted: state.sourceRedacted,
+    source_hashes: state.sourceHashes,
     rules: state.rules,
   };
 }

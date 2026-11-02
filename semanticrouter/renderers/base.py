@@ -17,3 +17,7 @@ class ExportResult:
     text: str
     complete: bool
     diagnostics: list[str] = field(default_factory=list)
+    mode: str = "semantic"
+    preserved_commands: int = 0
+    rewritten_commands: int = 0
+    verification: dict = field(default_factory=dict)

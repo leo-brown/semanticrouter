@@ -227,24 +227,33 @@ class ExportTests(unittest.TestCase):
             route_decision(converted, "TO-BORDER", "203.0.113.0/24"), "reject"
         )
 
-    def test_unknown_feature_blocks_full_export(self):
+    def test_unknown_feature_requires_context_but_native_export_preserves_it(self):
         r = model("/interface wireguard add name=wg private-key=DO-NOT-LEAK")
-        with self.assertRaises(UnsupportedExport):
-            export_router(r, "routeros", "7.19")
-        result = export_router(r, "routeros", "7.19", True)
-        self.assertFalse(result.complete)
-        self.assertIn("PARTIAL", result.text)
-        self.assertNotIn("DO-NOT-LEAK", result.text)
+        from semanticrouter.serialization import router_from_dict
 
-    def test_unsupported_property_blocks_full_export(self):
+        without_source = router_from_dict(r.to_dict())
+        with self.assertRaises(UnsupportedExport):
+            export_router(without_source, "routeros", "7.19")
+        result = export_router(r, "routeros", "source")
+        self.assertTrue(result.complete)
+        self.assertIn(
+            "DO-NOT-LEAK",
+            result.text,
+            "An explicitly requested complete config retains its private settings",
+        )
+        self.assertNotIn("DO-NOT-LEAK", json.dumps(r.to_dict()))
+
+    def test_vendor_property_is_preserved_in_native_export(self):
         r = model("/ip dns set servers=1.1.1.1 allow-remote-requests=yes")
-        with self.assertRaises(UnsupportedExport):
-            export_router(r, "routeros", "7.19")
+        result = export_router(r, "routeros", "source")
+        self.assertIn("allow-remote-requests=yes", result.text)
+        self.assertTrue(result.complete)
 
-    def test_unresolved_selector_blocks_full_export(self):
+    def test_native_selector_is_preserved_without_evaluating_it(self):
         r = model('/ip firewall filter set [ find comment="x" ] disabled=no')
-        with self.assertRaises(UnsupportedExport):
-            export_router(r, "routeros", "7.19")
+        result = export_router(r, "routeros", "source")
+        self.assertTrue(result.complete)
+        self.assertIn('[ find comment="x" ]', result.text)
 
     def test_unsupported_target_version(self):
         for v in ("6.49", "7", "7.20", "8.1"):
@@ -291,7 +300,10 @@ class ExportTests(unittest.TestCase):
             )
 
     def test_inactive_bgp_definitions_not_silently_dropped(self):
-        r = model("/routing bgp instance add name=unused as=64512", version="7.19")
+        r = model("/routing bgp instance add name=unused as=64512", version="7.20")
+        result = export_router(r, "routeros", "source")
+        self.assertTrue(result.complete)
+        self.assertIn("name=unused", result.text)
         with self.assertRaises(UnsupportedExport):
             export_router(r, "routeros", "7.19")
 
@@ -317,7 +329,9 @@ class ExportTests(unittest.TestCase):
     def test_cli_partial_exit_code(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "router.cfg"
-            p.write_text("/interface bridge add name=bridge")
+            p.write_text(
+                "# exported by RouterOS 6.49.10\n/interface bridge add name=bridge"
+            )
             self.assertEqual(
                 main(
                     [

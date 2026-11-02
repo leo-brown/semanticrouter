@@ -26,8 +26,8 @@ python3 -m venv .venv
 python3 -m pip install -e .
 
 semanticrouter inspect examples/configs/example-bng.cfg
-semanticrouter export tests/fixtures/routeros6.rsc \
-  --vendor routeros --version 7.19.3 --output /tmp/migrated.rsc
+semanticrouter export examples/configs/example-bng.cfg \
+  --vendor routeros --version source --output /tmp/complete.rsc
 semanticrouter audit examples/configs --rules semanticrouter/suites/baseline.json
 ```
 
@@ -94,18 +94,26 @@ extension points.
 ## Scope and limitations
 
 - RouterOS 6/7 export import, including terse/section syntax and BGP inheritance.
-- Supported-subset RouterOS 7.1–7.19 rendering and Cisco IOS 15 input ACL artifacts.
+- Complete source-aware RouterOS 6/7 exports, including unmodeled native properties.
+- Supported-subset ROS6→ROS7 migration and Cisco IOS 15 input ACL artifacts.
 - Ordered firewall/route evaluation, with **unknown distinct from pass**.
 - Optional editable example suites, including 29 Brighton estate checks; none
   auto-enabled.
 - Composable JSON predicates for collection, cross-router and route-policy assertions.
 - Source file/line evidence and strict JSON hydration of common models.
 
-Full exports fail on uncovered features. A partial fragment requires explicit
-`--allow-partial`, carries an omission banner, and exits `2`. The renderer produces
-additive statements for a prepared target; it is not reconciliation or a deployment
-engine. IOS ACL attachment remains an operator decision. Exact firmware cannot be
-inferred from hardware or stripped export headers.
+Full RouterOS export defaults to `--version source`: it retains every original native
+statement and applies supported model edits. Each output is re-imported and compared
+against the requested semantic model and an ordered native statement ledger. Original
+credentials stay outside model JSON and are included only in an explicitly requested
+complete configuration. See
+[complete export and round-trip verification](docs/export.md).
+
+Cross-vendor or layout-changing migrations still require semantic mappings. A partial
+fragment requires explicit `--allow-partial`, carries an omission banner, and exits `2`.
+The renderer produces additive statements for a prepared target; it is not
+reconciliation or a deployment engine. IOS ACL attachment remains an operator decision.
+Exact firmware cannot be inferred from hardware or stripped export headers.
 
 See the [capability matrix and policy semantics](docs/capabilities.md) before
 interpreting a finding or using a conversion.

@@ -1,7 +1,6 @@
 """Render supported common-model features into a concrete RouterOS 7 syntax train."""
 
 import re
-from ipaddress import ip_interface
 
 from ..definitions import definition
 from .base import UnsupportedExport
@@ -30,14 +29,8 @@ def command(path, **attrs):
     )
 
 
-def render(router, version):
-    """Return configuration lines and omissions; never apply output to a device."""
-    diagnostics = []
-    lines = []
-
-    def issue(message):
-        diagnostics.append(message)
-
+def validate_version(version):
+    """Validate the concrete target train for both semantic and source-aware output."""
     if not re.fullmatch(r"7\.\d+(?:\.\d+)?", version):
         raise UnsupportedExport("Choose a concrete stable RouterOS 7 version.")
     parts = tuple(map(int, version.split(".")))
@@ -46,22 +39,49 @@ def render(router, version):
     maximum = tuple(map(int, d["export_max_version_exclusive"].split(".")))
     if not (minimum <= parts < maximum):
         raise UnsupportedExport(d["export_note"])
+
+
+def route_expression(rule):
+    """Render a known route predicate; opaque native rules require their source."""
+    if not rule.supported:
+        raise UnsupportedExport(
+            "Edit the original source expression for an unresolved routing policy."
+        )
+    action = "reject" if rule.action == "discard" else rule.action
+    expr = action + ";"
+    if rule.prefix:
+        condition = "dst " + ("==" if rule.exact else "in") + " " + rule.prefix
+        if rule.min_length == rule.max_length:
+            condition += " && dst-len == " + str(rule.min_length)
+        else:
+            if rule.min_length:
+                condition += " && dst-len >= " + str(rule.min_length)
+            if rule.max_length < 32:
+                condition += " && dst-len <= " + str(rule.max_length)
+        expr = "if (" + condition + ") { " + action + "; }"
+    return expr
+
+
+def render(router, version):
+    """Return configuration lines and omissions; never apply output to a device."""
+    diagnostics = []
+    lines = []
+
+    def issue(message):
+        diagnostics.append(message)
+
+    validate_version(version)
     if router.identity:
         lines.append("/system identity set name=" + quote(router.identity))
     if router.dns:
         lines.append("/ip dns set servers=" + quote(",".join(router.dns)))
     for a in router.addresses:
-        if a.peer and a.peer not in (
-            str(ip_interface(a.address).ip),
-            str(ip_interface(a.address).network.network_address),
-        ):
-            issue("Host-route peer addressing is not exported: " + a.interface)
-            continue
         lines.append(
             command(
                 "/ip address",
                 address=a.address,
                 interface=a.interface,
+                network=a.peer,
                 disabled="no" if a.enabled else "yes",
             )
         )
@@ -100,18 +120,7 @@ def render(router, version):
         if not rule.supported:
             issue("Unsupported routing policy at " + str(rule.source))
             continue
-        action = "reject" if rule.action == "discard" else rule.action
-        expr = action + ";"
-        if rule.prefix:
-            condition = "dst " + ("==" if rule.exact else "in") + " " + rule.prefix
-            if rule.min_length == rule.max_length:
-                condition += " && dst-len == " + str(rule.min_length)
-            else:
-                if rule.min_length:
-                    condition += " && dst-len >= " + str(rule.min_length)
-                if rule.max_length < 32:
-                    condition += " && dst-len <= " + str(rule.max_length)
-            expr = "if (" + condition + ") { " + action + "; }"
+        expr = route_expression(rule)
         lines.append(
             command(
                 "/routing filter rule",

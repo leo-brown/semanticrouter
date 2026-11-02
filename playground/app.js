@@ -5,7 +5,7 @@
  */
 import { state, clone, current } from './state.js';
 import { $, esc, notify, download, engineStatus } from './dom.js';
-import { startEngine, callEngine } from './engine.js';
+import { startEngine, callEngine, exportModel } from './engine.js';
 import {
   configureViews,
   render,
@@ -187,13 +187,13 @@ async function probe(target, values) {
 function bindExport() {
   $('#export-vendor').onchange = () =>
     ($('#export-version').value =
-      $('#export-vendor').value === 'routeros' ? '7.19.3' : '15.2');
+      $('#export-vendor').value === 'routeros' ? 'source' : '15.2');
   $('#export-form').onsubmit = async (event) => {
     event.preventDefault();
     const box = $('#export-result');
     box.textContent = 'Rendering with Python…';
     try {
-      const result = await callEngine('export', {
+      const result = await exportModel({
         vendor: $('#export-vendor').value,
         version: $('#export-version').value.trim(),
         partial: $('#export-partial').checked,

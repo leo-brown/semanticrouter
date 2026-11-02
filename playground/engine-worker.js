@@ -9,7 +9,8 @@ async function boot() {
   const runtimeBase = new URL(configuredBase, self.location.href).href;
   const { loadPyodide } = await import(runtimeBase + 'pyodide.mjs');
   const py = await loadPyodide({ indexURL: runtimeBase });
-  const response = await fetch('./engine.json');
+  // Revalidate on boot so a refreshed UI cannot retain an obsolete exporter.
+  const response = await fetch('./engine.json', { cache: 'no-cache' });
   if (!response.ok) throw new Error('Unable to load middleware sources');
   const sources = await response.json();
   for (const [name, text] of Object.entries(sources)) {

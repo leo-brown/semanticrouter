@@ -1,11 +1,13 @@
 """Build a static playground from the current middleware. No third-party build dependencies.
 
 No --config-dir: synthetic demo only. --config-dir: private deployment snapshots.
-Raw config text and credentials are never copied to the output directory.
+Originals are included only in the optional guarded PHP export endpoint; public assets
+and model/review snapshots exclude original credentials.
 """
 
 import argparse
 import base64
+import hashlib
 import json
 import shutil
 import sys
@@ -108,6 +110,8 @@ def build(
     from semanticrouter.suites import example_suites
 
     sources = {}
+    original_sources = {}
+    source_files = {}
     rules = []
     suites = example_suites()
     policy = {}
@@ -137,24 +141,41 @@ def build(
             )
         if not paths:
             raise ValueError("No .cfg or .rsc exports found in the config directory")
-        routers = [load(path) for path in paths]
+        from semanticrouter.adapters.routeros import RouterOSRouter
+
+        original_bytes = {path.stem: path.read_bytes() for path in paths}
+        original_sources = {
+            name: content.decode("utf-8") for name, content in original_bytes.items()
+        }
+        source_files = {
+            path.stem: {
+                "file": path.name,
+                "sha256": hashlib.sha256(original_bytes[path.stem]).hexdigest(),
+            }
+            for path in paths
+        }
+        routers = [
+            RouterOSRouter(
+                path.stem, original_sources[path.stem], str(path)
+            ).to_common()
+            for path in paths
+        ]
         if len({router.name for router in routers}) != len(routers):
             raise ValueError("Config filenames must produce unique router names")
         mode = "private configuration snapshot"
         sources = {
-            router.name: redact_export(path.read_text())
-            for router, path in zip(routers, paths)
+            router.name: redact_export(original_sources[router.name])
+            for router in routers
         }
     else:
         router = load(ROOT / "tests/fixtures/routeros6.rsc")
         router.name = "example-bng"
         routers = [router]
         mode = "synthetic demo"
-        sources = {
-            router.name: redact_export(
-                (ROOT / "tests/fixtures/routeros6.rsc").read_text()
-            )
+        original_sources = {
+            router.name: (ROOT / "tests/fixtures/routeros6.rsc").read_text()
         }
+        sources = {name: redact_export(text) for name, text in original_sources.items()}
 
     if not snapshot:
         # Dataset selection is separate from test intent: no customer IPs or roles
@@ -201,6 +222,14 @@ def build(
         "mode": mode,
         "sources": sources,
         "sources_redacted": True,
+        "source_redacted": {
+            name: text != original_sources.get(name, "").replace("\r\n", "\n")
+            for name, text in sources.items()
+        },
+        "source_url": "source.php" if visualiser and config_dir else None,
+        "source_hashes": {name: item["sha256"] for name, item in source_files.items()}
+        if visualiser and config_dir
+        else {},
         "rules": rules,
         "rule_results": [asdict(result) for result in results],
         "rule_suites": suites,
@@ -235,6 +264,28 @@ def build(
         )
         (output / "data.php").write_text(endpoint)
         shutil.copyfile(ROOT / "playground/runtime.php", output / "runtime.php")
+        gateway = output / "source.php"
+        if config_dir:
+            # Full originals live only inside this guarded PHP endpoint, separate
+            # from public assets and redacted model/review data. Capturing bytes at
+            # build time keeps exports tied to the exact imported snapshot.
+            originals = {
+                name: {
+                    **entry,
+                    "content": base64.b64encode(
+                        original_sources[name].encode()
+                    ).decode(),
+                }
+                for name, entry in source_files.items()
+            }
+            manifest = base64.b64encode(json.dumps(originals).encode()).decode()
+            gateway.write_text(
+                (ROOT / "playground/source.php")
+                .read_text()
+                .replace("__SOURCE_MANIFEST__", manifest)
+            )
+        elif gateway.exists():
+            gateway.unlink()
         (output / "index.html").unlink()
         if (output / "data.json").exists():
             (output / "data.json").unlink()

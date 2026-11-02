@@ -27,6 +27,18 @@ The public imports `semanticrouter.load`, `RouterOSRouter` and
 package so feature implementations can grow without coupling every parser change to
 service inspection or target rendering.
 
+## Source-aware export
+
+`renderers/routeros_native.py` keeps an ordered source document outside common-model
+serialization. It merges mapped edits into native statements, retains all other syntax
+and private fields, and requires functional-model and native-ledger round-trip equality.
+`RouterOSRouter.to_common()` attaches the private in-memory source artifact used by
+Python exports. JSON hydration intentionally does not restore it; browser export
+supplies an explicit authenticated original. Source presence is not required by audits
+or tests. `unexported` records semantic translation coverage, not omissions from native
+preservation. See [export](export.md) for target/layout boundaries and the comparison
+contract.
+
 ## Evidence and uncertainty
 
 A parser command retains vendor attributes, selector text and source file/line. Feature

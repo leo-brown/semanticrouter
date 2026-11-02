@@ -1,0 +1,12 @@
+{
+  "vendor": "mikrotik",
+  "os": "routeros",
+  "family": "7",
+  "native_min_version": "7.20",
+  "native_marker": "/routing bgp instance",
+  "connection_path": "/routing bgp connection",
+  "instance_reference": "instance",
+  "native_export": "preserve",
+  "note": "Explicit BGP instances require RouterOS 7.20+. Source-aware export preserves this layout; changing to the pre-7.20 layout requires translation.",
+  "reference": "https://help.mikrotik.com/docs/spaces/ROS/pages/328220/BGP"
+}

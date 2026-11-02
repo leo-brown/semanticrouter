@@ -11,7 +11,15 @@ from .renderers.base import ExportResult, UnsupportedExport
 __all__ = ["ExportResult", "UnsupportedExport", "export_router"]
 
 
-def export_router(router, vendor, version, allow_partial=False):
+def export_router(
+    router,
+    vendor,
+    version,
+    allow_partial=False,
+    *,
+    source_text=None,
+    source_version=None,
+):
     """Render a concrete vendor/version target, refusing silent feature loss.
 
     ``allow_partial`` permits a labelled fragment; it never changes the returned
@@ -21,6 +29,26 @@ def export_router(router, vendor, version, allow_partial=False):
     renderers = {"routeros": routeros.render, "cisco-ios": ios.render}
     if vendor not in renderers:
         raise UnsupportedExport("Unknown target vendor " + vendor)
+    source_text = (
+        source_text
+        if source_text is not None
+        else getattr(router, "_routeros_source", None)
+    )
+    source_version = source_version or getattr(router, "_routeros_source_version", None)
+    if vendor == "routeros" and source_text is not None:
+        from .adapters.routeros import RouterOSRouter
+        from .renderers.routeros_native import render_complete
+
+        original = RouterOSRouter(router.name, source_text, version=source_version)
+        family = original.bgp.family
+        if version == "source" or family != "6":
+            # Semantic uncertainty is not an omission when its original syntax is
+            # retained. A changed model must still pass native round-trip validation.
+            return render_complete(router, version, source_text, source_version)
+    if version == "source":
+        raise UnsupportedExport(
+            "Original-syntax export requires the imported original configuration."
+        )
     lines, diagnostics = renderers[vendor](router, version)
 
     def issue(message):
@@ -60,4 +88,16 @@ def export_router(router, vendor, version, allow_partial=False):
         if complete
         else "PARTIAL CONFIGURATION — omitted features; review diagnostics"
     )
-    return ExportResult(banner + "\n" + "\n".join(lines) + "\n", complete, diagnostics)
+    text = banner + "\n" + "\n".join(lines) + "\n"
+    verification = {}
+    if complete and vendor == "routeros":
+        from .adapters.routeros import RouterOSRouter
+        from .renderers.routeros_native import functional
+
+        restored = RouterOSRouter(router.name, text, version=version).to_common()
+        if functional(restored) != functional(router):
+            raise UnsupportedExport(
+                "Generated RouterOS configuration did not round-trip to the requested semantic model."
+            )
+        verification = {"semantic_match": True, "native_statement_match": None}
+    return ExportResult(text, complete, diagnostics, verification=verification)

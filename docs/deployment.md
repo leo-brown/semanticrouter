@@ -91,6 +91,10 @@ parent Visualiser.
   operational `data.json` or `index.html` is left in this deployment.
 - `runtime.php` checks the same access policy, permits only five exact runtime
   filenames, supplies correct JavaScript/WebAssembly MIME types, and supports HEAD.
+- `source.php` is generated only for a private config-directory build. It uses the same
+  authentication, exact device whitelist and SHA-256 snapshot checks before supplying an
+  original on an explicit export request. Backups that changed since build return 409.
+  The config directory must remain readable by PHP at its deployed relative path.
 - UI and Python source assets contain no operational configs. PHP must execute as PHP;
   do not host this optional output as plain static files.
 
@@ -108,7 +112,7 @@ dataset, not to the semantic router model itself.
 | Snapshot loads but engine does not | Check runtime assets and worker errors; baseline findings are not newly evaluated results |
 | PHP returns forbidden              | Use the parent application's established login or trusted-source policy                   |
 | Models are stale                   | Rebuild from newer exports or import the exports locally in the browser                   |
-| Full export is blocked             | Read omission diagnostics; opt into a fragment only when that is the intended artifact    |
+| Full export is blocked             | Use the original config and source target; inspect layout/round-trip diagnostics          |
 
 Refresh after deployment so updated UI and worker sources load together. The source
 manifest `engine.json` bundles the actual Python modules and firmware definitions; there

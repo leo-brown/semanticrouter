@@ -19,7 +19,7 @@ from .values import enabled, milliseconds
 
 @dataclass
 class RouterOSRouter:
-    """Vendor router snapshot with raw export text confined to the adapter.
+    """Vendor router snapshot with raw export text kept as a private source artifact.
 
     Construct once to lex the export; feature views share that already-parsed command
     sequence. The common model contains supported semantics and provenance, not
@@ -90,9 +90,11 @@ class RouterOSRouter:
                     )
                 )
             if p == "/system identity":
-                r.identity = a.get("name")
+                if "name" in a:
+                    r.identity = a["name"]
             elif p == "/ip dns":
-                r.dns = a.get("servers", "").split(",") if a.get("servers") else []
+                if "servers" in a:
+                    r.dns = a["servers"].split(",") if a["servers"] else []
             elif p == "/ip address" and "address" in a:
                 addr = a["address"]
                 if "/" not in addr:
@@ -127,8 +129,10 @@ class RouterOSRouter:
                         )
                     )
             elif p == "/snmp":
-                r.snmp_enabled = a.get("enabled") == "yes"
-                r.snmp_location = a.get("location")
+                if "enabled" in a:
+                    r.snmp_enabled = a["enabled"] == "yes"
+                if "location" in a:
+                    r.snmp_location = a["location"]
             elif p == "/ipv6 firewall filter":
                 r.firewall_v6.append(firewall_rule(c))
             elif p == "/interface pppoe-server server":
@@ -179,6 +183,11 @@ class RouterOSRouter:
                             + chain,
                         )
                     )
+        # Keep the source artifact out of dataclass fields/repr/JSON. Audits still
+        # consume only common objects; full same-vendor export can retain syntax
+        # and private fields that deliberately do not belong in the semantic model.
+        r._routeros_source = self.text
+        r._routeros_source_version = self.version
         return r
 
 

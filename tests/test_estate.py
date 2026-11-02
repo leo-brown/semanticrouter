@@ -5,7 +5,7 @@ import os
 import unittest
 from pathlib import Path
 
-from semanticrouter import UnsupportedExport, export_router, load
+from semanticrouter import export_router, load
 from semanticrouter.policy import audit_brighton as audit
 from semanticrouter.redaction import redact_export
 from semanticrouter.rules import run_rules
@@ -41,10 +41,18 @@ class EstateTests(unittest.TestCase):
                 if r.role in ("bng", "border", "edge", "core"):
                     self.assertTrue(r.bgp.peers)
 
-    def test_private_full_exports_are_explicitly_incomplete(self):
+    def test_private_full_exports_round_trip_every_original_statement(self):
         for r in self.routers:
-            with self.subTest(r.name), self.assertRaises(UnsupportedExport):
-                export_router(r, "routeros", "7.19.3")
+            with self.subTest(r.name):
+                result = export_router(r, "routeros", "source")
+                self.assertTrue(result.complete)
+                self.assertTrue(result.verification["semantic_match"])
+                self.assertTrue(result.verification["native_statement_match"])
+                self.assertTrue(result.verification["original_statements_match"])
+                self.assertEqual(
+                    result.verification["input_statements"],
+                    result.verification["output_statements"],
+                )
 
     def test_audit_produces_only_known_severities_and_loaded_devices(self):
         findings = audit(self.routers, self.policy)

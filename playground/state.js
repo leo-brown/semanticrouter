@@ -19,6 +19,9 @@ export const state = {
   rules: [],
   ruleResults: [],
   sources: {},
+  nativeSources: {},
+  sourceHashes: {},
+  sourceURL: null,
   sourceRedacted: {},
   ruleSuites: [],
 };

@@ -53,13 +53,18 @@ migration, including instance redistribution and prefix-length filter conversion
 python3 -m semanticrouter export tests/fixtures/routeros6.rsc --vendor routeros --version 7.19.3 --output /tmp/migrated.rsc
 ```
 
-RouterOS 7.20+ BGP instance syntax needs a separate renderer and is explicitly rejected
-in this release. This limit is stored in the firmware definition. Early RouterOS 6 minor
+RouterOS 7.20+ BGP instance syntax is preserved by source-aware export. Converting
+between that layout and the older template/connection layout requires migration
+mappings. This limit is stored in the firmware definition. Early RouterOS 6 minor
 releases are parsed by syntax family; only the supplied synthetic 6.49-style fixture has
 migration regression coverage so far.
 
-Full exports fail if any source command/property or modeled feature cannot be
-translated. To deliberately request a fragment:
+Complete source-aware RouterOS export (`--version source`) retains original native
+statements, including features outside semantic translation coverage, and compares the
+output against both the requested model and the native statement ledger. It needs the
+original source; a redacted or model-only snapshot cannot recover private settings. See
+[export verification](export.md). Concrete migrations and cross-vendor renderers still
+fail if a feature lacks a target mapping. To deliberately request a fragment:
 
 ```sh
 python3 -m semanticrouter export /path/to/router.cfg --vendor cisco-ios --version 15.2 --allow-partial --output /tmp/input-acl.ios

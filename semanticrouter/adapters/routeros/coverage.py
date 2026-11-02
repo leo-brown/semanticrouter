@@ -1,8 +1,9 @@
 """Track which imported properties have complete semantic export mappings.
 
 This check is independent of inspection: a router can be useful for auditing while
-still carrying commands that prevent a complete conversion. No raw command is
-replayed as a shortcut around missing mappings."""
+still carrying commands that prevent a cross-platform conversion. Complete native
+export uses a separate source document and verifies preserved statements; it does not
+pretend those statements have portable semantic mappings."""
 
 from ipaddress import ip_interface, ip_network
 

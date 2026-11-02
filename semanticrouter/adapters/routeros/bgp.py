@@ -44,7 +44,7 @@ def route_rule(c):
         return RouteRule(a.get("chain", ""), s, enabled=enabled(a), source=c.source)
     # Deliberately narrow grammar. Attribute mutations, jumps and complex expressions stay unknown.
     m = re.fullmatch(
-        r"if\s*\(\s*dst\s+(in|==)\s+([\d./]+)\s*(?:&&\s*dst-len\s*(>|>=|==|<=|<)\s*(\d+))?\s*\)\s*\{\s*(accept|reject)\s*;?\s*\}",
+        r"if\s*\(\s*dst\s+(in|==)\s+([\d./]+)\s*((?:&&\s*dst-len\s*(?:>=|>|==|<=|<)\s*\d+\s*)*)\)\s*\{\s*(accept|reject)\s*;?\s*\}",
         s,
     )
     if not m:
@@ -55,22 +55,22 @@ def route_rule(c):
             supported=False,
             source=c.source,
         )
-    op, p, cmp, n, action = m.groups()
+    op, p, clauses, action = m.groups()
     if "/" not in p:
         p += "/32"
     lo, hi = 0, 32
-    if cmp:
+    for cmp, n in re.findall(r"&&\s*dst-len\s*(>=|>|==|<=|<)\s*(\d+)", clauses):
         n = int(n)
         if cmp == ">":
-            lo = n + 1
+            lo = max(lo, n + 1)
         if cmp == ">=":
-            lo = n
+            lo = max(lo, n)
         if cmp == "==":
-            lo = hi = n
+            lo, hi = max(lo, n), min(hi, n)
         if cmp == "<":
-            hi = n - 1
+            hi = min(hi, n - 1)
         if cmp == "<=":
-            hi = n
+            hi = min(hi, n)
     return RouteRule(
         a.get("chain", ""), action, p, lo, hi, op == "==", enabled(a), True, c.source
     )

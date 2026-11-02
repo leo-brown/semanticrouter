@@ -86,11 +86,18 @@ def handle(request_json):
                 result = route_decision(selected, request["chain"], request["prefix"])
             return json.dumps({"ok": True, "verdict": result})
         if action == "export":
+            source = request.get("source_text")
+            if source is not None and (
+                not isinstance(source, str) or len(source) > 5 * 1024 * 1024
+            ):
+                raise ValueError("Original source must be text under 5 MB")
             result = export_router(
                 selected,
                 request["vendor"],
                 request["version"],
                 request.get("partial", False),
+                source_text=source,
+                source_version=selected.platform.version,
             )
             return json.dumps({"ok": True, **asdict(result)})
         raise ValueError("Unknown operation")

@@ -70,3 +70,49 @@ export function callEngine(action, extra = {}) {
     });
   });
 }
+
+/** Obtain original syntax only on explicit RouterOS export, never during audits.
+ * Hosted originals are authenticated and pinned to the build's source hash. Local
+ * originals stay in memory; a redacted/edited review is never passed as complete. */
+export async function getExportSource(name) {
+  const text = state.sources[name];
+  if (typeof text === 'string' && !state.sourceRedacted[name]) return text;
+  if (state.sourceRedacted[name] && text !== state.baseline.sources?.[name])
+    throw new Error(
+      'This redacted source was edited. Load the original export before producing a complete configuration; your review edits have been kept.',
+    );
+  const hash = state.sourceHashes[name];
+  if (!state.sourceURL || !hash)
+    throw new Error(
+      'Load the original configuration to produce a complete export. This workspace contains only a redacted review copy.',
+    );
+  const key = name + ':' + hash;
+  if (state.nativeSources[key]) return state.nativeSources[key];
+  const page = new URL(location.href);
+  const url = new URL(state.sourceURL, page);
+  if (url.origin !== page.origin)
+    throw new Error('Original configs must come from this application.');
+  url.searchParams.set('device', name);
+  url.searchParams.set('hash', hash);
+  const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
+  if (!response.ok) throw new Error(await response.text());
+  if (!response.headers.get('content-type')?.includes('text/plain'))
+    throw new Error('Original source access requires the current Visualiser login.');
+  const original = await response.text();
+  if (original.length > 5 * 1024 * 1024)
+    throw new Error('Original export exceeds 5 MB.');
+  state.nativeSources[key] = original;
+  return original;
+}
+
+export async function exportModel(values) {
+  const revision = state.revision;
+  const selected = state.selected;
+  const source_text =
+    values.vendor === 'routeros' ? await getExportSource(selected) : undefined;
+  if (revision !== state.revision || selected !== state.selected)
+    throw new Error(
+      'The workspace changed while loading the original source. Run export again.',
+    );
+  return callEngine('export', { ...values, selected, source_text });
+}
