@@ -134,8 +134,8 @@ function renderMap() {
 }
 
 /** Build an expandable feature-domain section with caller-supplied escaped content. */
-function card(title, count, body, open = false) {
-  return `<details class="object-card" ${open ? 'open' : ''}><summary>${title}<span>${count}</span></summary><div class="object-content">${body || '<span class="muted">No explicit configuration</span>'}</div></details>`;
+function card(title, count, body) {
+  return `<details class="object-card" data-object-section="${esc(title)}" ${state.openObjectSections.has(title) ? 'open' : ''}><summary>${title}<span>${count}</span></summary><div class="object-content">${body || '<span class="muted">No explicit configuration</span>'}</div></details>`;
 }
 
 /** Escape a scalar model value before displaying it in the object inspector. */
@@ -170,7 +170,6 @@ function renderObjects(r) {
             ? 'enabled'
             : 'disabled',
       ) + rules,
-      true,
     ) +
     card('BGP', r.bgp.peers.length + ' peers', peers) +
     card(
@@ -247,6 +246,15 @@ function renderExport() {
 function renderInspector() {
   const r = current();
   if (!r) return;
+  const content = $('#inspector-content');
+  // Read the current DOM before replacing it: native toggle events can still be
+  // queued when the user immediately selects another node or inspector tab.
+  const remember = (section) => {
+    const key = section.dataset.objectSection;
+    if (section.open) state.openObjectSections.add(key);
+    else state.openObjectSections.delete(key);
+  };
+  content.querySelectorAll('[data-object-section]').forEach(remember);
   $('#selected-role').textContent = r.role.toUpperCase() + ' / SEMANTIC ROUTER';
   $('#selected-name').textContent = r.name;
   $('#selected-platform').textContent =
@@ -257,8 +265,15 @@ function renderInspector() {
   document
     .querySelectorAll('[data-tab]')
     .forEach((b) => b.classList.toggle('active', b.dataset.tab === state.tab));
-  const content = $('#inspector-content');
-  if (state.tab === 'objects') content.innerHTML = renderObjects(r);
+  if (state.tab === 'objects') {
+    content.innerHTML = renderObjects(r);
+    content.querySelectorAll('[data-object-section]').forEach((section) => {
+      section.ontoggle = () => {
+        // Ignore delayed events from the previous router's detached details nodes.
+        if (section.isConnected) remember(section);
+      };
+    });
+  }
   if (state.tab === 'experiment') {
     content.innerHTML = renderExperiment(r);
     actions.bindExperiments(r);

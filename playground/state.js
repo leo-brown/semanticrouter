@@ -8,6 +8,8 @@ export const state = {
   originals: new Map(),
   selected: null,
   tab: 'objects',
+  // Inspector preferences apply across nodes, rather than resetting per router.
+  openObjectSections: new Set(['FirewallV4']),
   modified: new Set(),
   engineReady: false,
   policyModified: false,
