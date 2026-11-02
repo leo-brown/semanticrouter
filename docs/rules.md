@@ -9,6 +9,10 @@ JSON, or explicitly choose an optional example suite. Adding examples preserves 
 definitions with the same ID. Every rule, including the estate examples, can be edited,
 disabled or deleted.
 
+The rule editor opens only for Create test or an explicit rule selection. Close editor
+returns to the list and keeps unsaved drafts in this tab. Loading a suite or returning
+to step 1 does not automatically open a rule.
+
 Source and model drafts apply only after parsing/validation. Rule drafts become active
 only after **Save rule → run tests** validates them. The Python engine evaluates
 objects; changing a rule never reparses exports. Failed results open the actual rule

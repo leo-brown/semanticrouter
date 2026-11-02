@@ -24,6 +24,7 @@ test('standalone startup, JSON edit and reset work through the real module graph
   const typeOptions = ['field', 'packet', 'peers', 'route', 'expression'].map(
     (testKind) => ({ dataset: { testKind } }),
   );
+  const ruleFiles = [{ dataset: { ruleFile: 'snmp' } }];
   const ruleToggle = { dataset: { enableRule: 'snmp' }, checked: true };
   const element = (selector) => {
     if (!elements.has(selector))
@@ -44,6 +45,8 @@ test('standalone startup, JSON edit and reset work through the real module graph
           if (selector === '#ide-flow' && query === '[data-stage]') return stages;
           if (selector === '#new-rule-options' && query === '[data-test-kind]')
             return typeOptions;
+          if (selector === '#rule-files' && query === '[data-rule-file]')
+            return ruleFiles;
           if (selector === '#rule-files' && query === '[data-enable-rule]')
             return [ruleToggle];
           return [];
@@ -141,6 +144,44 @@ test('standalone startup, JSON edit and reset work through the real module graph
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(state.engineReady, true);
     assert.equal(
+      element('#ide-columns').hidden,
+      true,
+      'saved rules do not automatically open the editor',
+    );
+    assert.equal(element('#ide-toolbar').hidden, true);
+    ruleFiles[0].onclick();
+    assert.equal(
+      element('#ide-columns').hidden,
+      false,
+      'selecting a rule opens its editor',
+    );
+    const draft = JSON.parse(element('#rule-definition').value);
+    draft.name = 'Unsaved draft';
+    element('#rule-definition').value = JSON.stringify(draft);
+    element('#rule-definition').oninput();
+    element('#close-rule-editor').onclick();
+    assert.equal(element('#ide-columns').hidden, true);
+    ruleFiles[0].onclick();
+    assert.equal(
+      JSON.parse(element('#rule-definition').value).name,
+      'Unsaved draft',
+      'closing keeps the draft',
+    );
+    stages.find((button) => button.dataset.stage === 'rules').onclick();
+    assert.equal(
+      element('#ide-columns').hidden,
+      true,
+      'step 1 returns to the rule list',
+    );
+    element('#new-rule').onclick();
+    assert.equal(
+      element('#ide-columns').hidden,
+      false,
+      'creating a test opens the editor',
+    );
+    element('#close-rule-editor').onclick();
+
+    assert.equal(
       element('#test-design').hidden,
       false,
       'rule choices belong to step 1',
@@ -235,6 +276,11 @@ test('standalone startup, JSON edit and reset work through the real module graph
     assert.equal(state.rules.length, 1, 'examples never activate on startup');
     element('#suite-example').value = '0';
     await element('#add-example').onclick();
+    assert.equal(
+      element('#ide-columns').hidden,
+      true,
+      'adding examples does not start editing a rule',
+    );
     assert.equal(
       state.rules.length,
       2,

@@ -173,11 +173,16 @@
             </p>
           </section>
 
-          <div class="ide-toolbar">
-            <span id="ide-filepath"></span
-            ><button id="ide-primary" class="button primary">Parse → model</button>
+          <div id="ide-toolbar" class="ide-toolbar" hidden>
+            <span id="ide-filepath"></span>
+            <div class="inline-actions">
+              <button id="close-rule-editor" class="button" hidden>Close editor</button>
+              <button id="ide-primary" class="button primary">
+                Save rule → run tests
+              </button>
+            </div>
           </div>
-          <div class="ide-columns">
+          <div id="ide-columns" class="ide-columns" hidden>
             <div id="ide-editor" class="ide-editor"></div>
             <aside id="ide-context" class="ide-context"></aside>
           </div>

@@ -234,7 +234,7 @@ export function initializeWorkbench(data, callbacks) {
   } catch {
     /* A corrupt browser preference must not prevent opening source files. */
   }
-  selectedRule = state.rules[0]?.id || null;
+  selectedRule = null;
   // Two persistent view choices make the topology discoverable from the editor.
   $('#ide-workbench').onclick = () => {
     overview = false;
@@ -246,6 +246,10 @@ export function initializeWorkbench(data, callbacks) {
   };
   initializeTestTypePicker();
   $('#new-rule').onclick = () => newRule($('#new-rule-kind').value);
+  $('#close-rule-editor').onclick = () => {
+    selectedRule = null;
+    renderWorkbench();
+  };
   $('#suite-example').innerHTML =
     '<option value="">Choose an optional starting point…</option>' +
     state.ruleSuites
@@ -319,7 +323,7 @@ export function initializeWorkbench(data, callbacks) {
       newRules.clear();
       sourceDrafts.clear();
       modelDrafts.clear();
-      selectedRule = state.rules[0]?.id;
+      selectedRule = null;
       persistRules();
       hooks.render();
       notify('Workspace opened: models, sources and rule files are ready.');
@@ -344,7 +348,7 @@ async function addSuite(value) {
     throw new Error('The rule list changed while importing. Please try again.');
   state.rules = rules;
   state.policy = { ...clone(suite.variables || {}), ...state.policy };
-  selectedRule = additions[0]?.id || state.rules[0]?.id;
+  selectedRule = null;
   stage = 'rules';
   overview = false;
   state.revision++;
@@ -405,6 +409,7 @@ export function renderWorkbench() {
       (b) =>
         (b.onclick = () => {
           stage = b.dataset.stage;
+          if (stage === 'rules') selectedRule = null;
           overview = false;
           renderWorkbench();
         }),
@@ -483,10 +488,16 @@ export function renderWorkbench() {
     ' · ' +
     state.modified.size +
     ' changed models';
+  // A suite is a list until the user explicitly creates or selects a rule.
+  // Closing the editor keeps drafts in memory so reopening does not discard work.
+  const showEditor = stage !== 'rules' || Boolean(savedRule());
+  $('#ide-toolbar').hidden = !showEditor;
+  $('#ide-columns').hidden = !showEditor;
+  $('#close-rule-editor').hidden = stage !== 'rules' || !showEditor;
   const content = $('#ide-editor');
   if (stage === 'source') renderSource(content);
   if (stage === 'model') renderModel(content);
-  if (stage === 'rules') renderRule(content);
+  if (stage === 'rules' && showEditor) renderRule(content);
   if (stage === 'tests') renderTests(content);
   if (stage === 'export') renderExport(content);
   renderContext();
@@ -735,7 +746,7 @@ function renderRule(content) {
     state.rules = state.rules.filter((r) => r.id !== selectedRule);
     newRules.delete(selectedRule);
     drafts.delete(selectedRule);
-    selectedRule = state.rules[0]?.id || null;
+    selectedRule = null;
     state.revision++;
     persistRules();
     renderWorkbench();
@@ -912,6 +923,7 @@ function renderExport(content) {
 }
 
 export function resetWorkbench() {
+  selectedRule = null;
   drafts.clear();
   newRules.clear();
   sourceDrafts.clear();
