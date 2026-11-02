@@ -51,6 +51,7 @@ def build(
         "engine.js",
         "views.js",
         "workbench.js",
+        "tree-editor.js",
         "ide.css",
     ):
         shutil.copyfile(ROOT / "playground" / name, output / name)

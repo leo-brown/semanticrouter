@@ -13,6 +13,16 @@ The rule editor opens only for Create test or an explicit rule selection. Close 
 returns to the list and keeps unsaved drafts in this tab. Loading a suite or returning
 to step 1 does not automatically open a rule.
 
+The editor opens in **Tree** mode. The definition tree covers metadata, scope and
+assertion fields; linked **Logic** and **Parameters** trees provide focused editing.
+Use the type selector for strings, numbers, booleans, lists, objects, references or
+logic operators. Expand branches, add properties/parameters or child conditions,
+rename keys, duplicate/remove nodes, and move list items up or down. Collection logic
+exposes its collection, item variable and condition. Undo/redo applies across panels.
+Each panel can switch to **JSON** for direct editing. Invalid text remains available
+when you close/reopen the editor and blocks saving until repaired (or discarded with
+Undo). Unsaved drafts and history stay in this tab; save before downloading a workspace.
+
 Source and model drafts apply only after parsing/validation. Rule drafts become active
 only after **Save rule → run tests** validates them. The Python engine evaluates
 objects; changing a rule never reparses exports. Failed results open the actual rule

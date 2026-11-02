@@ -160,6 +160,10 @@ class VisualiserDeploymentTests(unittest.TestCase):
             output = root / "web"
             with contextlib.redirect_stdout(io.StringIO()):
                 builder.build(output, runtime_dir=runtime, visualiser=True)
+            self.assertEqual(
+                (output / "tree-editor.js").read_bytes(),
+                (ROOT / "playground/tree-editor.js").read_bytes(),
+            )
             self.assertFalse((output / "data.json").exists())
             self.assertFalse((output / "index.html").exists())
             endpoint = (output / "data.php").read_text()

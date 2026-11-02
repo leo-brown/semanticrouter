@@ -778,3 +778,166 @@ body:not(.network-overview) .metrics strong {
   top: auto;
   bottom: calc(100% + 0.35rem);
 }
+
+/* Shared rule trees: typed values remain legible at the app's enlarged base size.
+ * Panels wrap rather than force the whole workbench wider on narrow screens. */
+.rule-tree-author {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: start;
+}
+.rule-tree-details {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.tree-editor {
+  border: 1px solid var(--line, #d5e0dc);
+  border-radius: 0.55rem;
+  background: #fff;
+  min-width: 0;
+  overflow: hidden;
+}
+.tree-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.65rem;
+  background: #f3f7f5;
+  border-bottom: 1px solid #d5e0dc;
+}
+.tree-toolbar h3 {
+  margin: 0 auto 0 0;
+  font-size: 0.8rem;
+}
+.tree-editor button {
+  padding: 0.23rem 0.4rem;
+  min-height: 1.6rem;
+  font-size: 0.65rem;
+  border-radius: 0.25rem;
+}
+.tree-modes {
+  display: flex;
+  gap: 0.15rem;
+}
+.tree-modes button[aria-pressed='true'] {
+  background: #087f72;
+  color: white;
+}
+.tree-body {
+  overflow: auto;
+  max-height: 65dvh;
+  padding: 0.45rem;
+}
+.tree-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0;
+}
+.tree-key {
+  font-family: var(--mono, monospace);
+  font-size: 0.65rem;
+  overflow-wrap: anywhere;
+}
+.tree-row > input {
+  flex: 1 1 8rem;
+  min-width: 5rem;
+}
+.tree-editor input,
+.tree-editor select {
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.3rem 0.35rem;
+  font-size: 0.65rem;
+  min-height: 1.7rem;
+}
+.tree-editor input[readonly] {
+  color: var(--muted);
+  background: #f3f7f5;
+}
+.tree-editor .tree-type {
+  max-width: 8.5rem;
+  color: #456a62;
+  background: #f3f7f5;
+}
+.tree-actions {
+  display: flex;
+  gap: 0.1rem;
+  margin-left: auto;
+}
+.tree-actions button {
+  color: #607971;
+  background: transparent;
+  border-color: transparent;
+}
+.tree-actions button:hover {
+  background: #e8f2ed;
+}
+.tree-count,
+.tree-null {
+  font-size: 0.6rem;
+  color: var(--muted);
+}
+.tree-spacer {
+  width: 1rem;
+}
+.tree-children {
+  margin-left: 0.55rem;
+  padding-left: 0.55rem;
+  border-left: 1px solid #d5e0dc;
+}
+.tree-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.4rem 0 0.65rem;
+}
+.tree-add input {
+  flex: 1 1 5rem;
+  min-width: 4rem;
+}
+.tree-reference {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.3rem 0;
+}
+.tree-reference input {
+  width: 100%;
+}
+.tree-reference small {
+  font-size: 0.6rem;
+  color: var(--muted);
+}
+.tree-json {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 18rem;
+  padding: 0.7rem;
+  border: 0;
+  font: 0.65rem/1.6 var(--mono, monospace);
+  resize: vertical;
+  tab-size: 2;
+}
+.tree-editor [hidden] {
+  display: none !important;
+}
+.tree-editor .error-text {
+  padding: 0 0.65rem;
+  font-size: 0.65rem;
+}
+.tree-editor .error-text:empty {
+  display: none;
+}
+.tree-editor :focus-visible {
+  outline: 2px solid #0d8d7e;
+  outline-offset: 2px;
+}
+@media (max-width: 75em) {
+  .rule-tree-author {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

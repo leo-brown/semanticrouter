@@ -5,6 +5,7 @@
 import { state, clone, current } from './state.js';
 import { $, esc, notify, download } from './dom.js';
 import { callEngine, exportModel } from './engine.js';
+import { TreeDocument, mountTreeEditor } from './tree-editor.js';
 
 let hooks;
 const drafts = new Map(),
@@ -13,23 +14,38 @@ const drafts = new Map(),
   modelDrafts = new Map();
 let selectedRule = null,
   stage = 'rules',
-  overview = false,
-  builderDirty = false;
+  overview = false;
 const savedRule = () =>
   state.rules.find((rule) => rule.id === selectedRule) || newRules.get(selectedRule);
 const definition = () =>
   drafts.get(selectedRule) ?? JSON.stringify(savedRule(), null, 2);
-const fields = [
-  'firewall_v4.connection_tracking',
-  'radius',
-  'radius[].timeout_ms',
-  'bgp.peers[].redistribute',
-  'ppp_servers[].mtu',
-  'snmp_enabled',
-  'snmp_location',
-  'dns',
-  'platform.family',
-];
+// Cached documents retain tree expansion, raw JSON and undo across navigation.
+const ruleDocuments = new Map();
+let ruleViews = [];
+function destroyRuleViews() {
+  for (const view of ruleViews) view.destroy();
+  ruleViews = [];
+}
+function ruleDocument() {
+  if (!ruleDocuments.has(selectedRule)) {
+    let value;
+    try {
+      value = JSON.parse(definition());
+    } catch {
+      value = savedRule();
+    }
+    const doc = new TreeDocument(value, (next, change) => {
+      // Changing assertion kind explicitly chooses a fresh, valid template. Raw
+      // JSON replacements retain exactly the structure the author provided.
+      if (!change.raw && JSON.stringify(change.path) === '["assert","type"]')
+        next.assert = template(next.assert.type);
+      return next;
+    });
+    ruleDocuments.set(selectedRule, doc);
+    if (drafts.has(selectedRule)) doc.editJSON([], drafts.get(selectedRule));
+  }
+  return ruleDocuments.get(selectedRule);
+}
 
 const testTypes = [
   [
@@ -179,6 +195,7 @@ function newRule(kind = 'packet') {
     enabled: true,
     severity: 'P1',
     scope: {},
+    params: {},
     assert: template(kind),
   };
   newRules.set(rule.id, rule);
@@ -328,6 +345,7 @@ export function initializeWorkbench(data, callbacks) {
       state.modified = new Set(state.routers.map((r) => r.name));
       state.revision++;
       drafts.clear();
+      ruleDocuments.clear();
       newRules.clear();
       sourceDrafts.clear();
       modelDrafts.clear();
@@ -433,6 +451,7 @@ export function renderWorkbench() {
         );
         const dirty =
           newRules.has(rule.id) ||
+          (ruleDocuments.has(rule.id) && !ruleDocuments.get(rule.id).valid) ||
           (drafts.has(rule.id) &&
             drafts.get(rule.id) !== JSON.stringify(rule, null, 2));
         return `<article class="rule-entry"><button class="rule-file ${rule.id === selectedRule && stage === 'rules' ? 'selected' : ''}" data-rule-file="${esc(rule.id)}"><span>${esc(rule.name)}${dirty ? ' •' : ''}</span><code>${esc(rule.id)}</code><small>${count.fail ? count.fail + ' fail' : count.unknown ? count.unknown + ' unknown' : count.pass ? count.pass + ' pass' : 'Not run'}</small></button><label class="rule-run"><input type="checkbox" data-enable-rule="${esc(rule.id)}" ${rule.enabled !== false ? 'checked' : ''} ${newRules.has(rule.id) ? 'disabled' : ''} aria-label="Run ${esc(rule.name)}">Run</label></article>`;
@@ -467,8 +486,14 @@ export function renderWorkbench() {
           await callEngine('rules_validate', { rules });
           if (state.revision !== revision)
             throw new Error('The rule list changed. Please try again.');
-          if (drafts.get(previous.id) === JSON.stringify(previous, null, 2))
+          if (
+            (!ruleDocuments.has(previous.id) || ruleDocuments.get(previous.id).valid) &&
+            (!drafts.has(previous.id) ||
+              drafts.get(previous.id) === JSON.stringify(previous, null, 2))
+          ) {
             drafts.delete(previous.id);
+            ruleDocuments.delete(previous.id);
+          }
           state.rules = rules;
           state.revision++;
           persistRules();
@@ -502,6 +527,7 @@ export function renderWorkbench() {
   $('#ide-toolbar').hidden = !showEditor;
   $('#ide-columns').hidden = !showEditor;
   $('#close-rule-editor').hidden = stage !== 'rules' || !showEditor;
+  destroyRuleViews();
   const content = $('#ide-editor');
   if (stage === 'source') renderSource(content);
   if (stage === 'model') renderModel(content);
@@ -626,134 +652,106 @@ async function applyModel() {
 function input(label, id, value, help = '') {
   return `<label class="field">${label}<input id="${id}" value="${esc(value)}">${help ? `<small>${help}</small>` : ''}</label>`;
 }
-function options(values, selected) {
-  return values
-    .map(
-      ([value, label]) =>
-        `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`,
-    )
-    .join('');
-}
+/** One rule document backs all three views. Editing a subtree immediately
+ * updates the definition without reconstructing fields or dropping custom data. */
 function renderRule(content) {
-  if (!selectedRule || !savedRule()) {
-    content.innerHTML =
-      '<div class="empty-state"><h2>Define the network you expect</h2><p>Create a test or choose an optional example suite above. Define the expected behaviour before changing configuration.</p></div>';
-    return;
+  if (!selectedRule || !savedRule()) return;
+  const id = selectedRule,
+    doc = ruleDocument();
+  content.innerHTML = `<div class="stage-intro"><h2>Design a reusable rule</h2><p>Browse the definition, build conditions and add parameters. Switch any panel to JSON when you need it. Save to validate and run the rule.</p></div><div class="rule-author rule-tree-author"><div id="rule-definition-panel"></div><div class="rule-tree-details"><div id="rule-logic-panel"></div><div id="rule-params-panel"></div></div></div><div class="inline-actions">${button('Duplicate', 'duplicate-rule')}${button('Delete', 'delete-rule')}${button('Download rule', 'download-rule')}</div><div id="ide-error" class="error-text" role="status"></div><div id="rule-draft-state" class="draft-state">${newRules.has(id) ? 'New draft · save to include in test runs' : 'Saved definition · edits are validated before replacing it'}</div>`;
+  const choices = (path, value) => {
+    let values;
+    const key = JSON.stringify(path);
+    if (key === '["severity"]') values = ['P1', 'P2'];
+    if (key === '["assert","type"]')
+      return testTypes.map(([kind, label]) => [kind, label]);
+    if (key === '["assert","operator"]')
+      values = ['equals', 'contains', 'includes_all', 'exists', 'count_at_least'];
+    if (key === '["assert","protocol"]') values = ['udp', 'tcp', 'icmp', 'ospf'];
+    if (key === '["assert","decision"]') values = ['accept', 'drop', 'reject'];
+    if (!values) return null;
+    if (!values.includes(String(value))) values.push(String(value));
+    return values.map((item) => [item, item]);
+  };
+  const suggestions = (path) => {
+    if (!path.length)
+      return [
+        'name',
+        'description',
+        'enabled',
+        'severity',
+        'scope',
+        'assert',
+        'params',
+      ];
+    if (JSON.stringify(path) === '["scope"]') return ['roles', 'names'];
+    return [];
+  };
+  const mount = (container, viewId, path, label, expressionMode = false) =>
+    mountTreeEditor({
+      container: $(container),
+      id: viewId,
+      document: doc,
+      path,
+      label,
+      expressionMode,
+      choices,
+      suggestions,
+      onSave: saveRule,
+    });
+  ruleViews.push(
+    mount('#rule-definition-panel', 'rule-definition', [], 'Rule definition'),
+  );
+  let detailViews = [],
+    previousKind;
+  function mountDetails() {
+    const type = doc.at(['assert', 'type']);
+    if (previousKind === type) return;
+    previousKind = type;
+    for (const view of detailViews) view.destroy();
+    detailViews = [
+      mount(
+        '#rule-logic-panel',
+        'rule-expression',
+        type === 'expression' ? ['assert', 'test'] : ['assert'],
+        type === 'expression' ? 'Logic' : 'Assertion',
+        type === 'expression',
+      ),
+      mount('#rule-params-panel', 'rule-params', ['params'], 'Parameters'),
+    ];
   }
-  let rule;
-  try {
-    rule = JSON.parse(definition());
-    if (
-      !rule ||
-      !rule.assert ||
-      !['packet', 'field', 'peers', 'route', 'expression'].includes(rule.assert.type)
-    )
-      rule = savedRule();
-  } catch {
-    rule = savedRule();
-  }
-  const a = rule.assert,
-    roles = Array.isArray(rule.scope?.roles) ? rule.scope.roles : [];
-  builderDirty = false;
-  const assertion =
-    a.type === 'expression'
-      ? `<label class="field">Logic (JSON expression)<textarea id="rule-expression" class="rule-logic" spellcheck="false">${esc(JSON.stringify(a.test, null, 2))}</textarea></label><p class="helper">Combine references, comparisons and all/any collection assertions. No Python code or network operations are executed.</p>`
-      : a.type === 'field'
-        ? `${input('Model path', 'rule-path', a.path, 'Use [] to check every item, e.g. ppp_servers[].mtu')}<label class="field">Expectation<select id="rule-operator">${options(
-            [
-              ['equals', 'equals'],
-              ['contains', 'contains item'],
-              ['includes_all', 'includes all items'],
-              ['exists', 'is explicitly present'],
-              ['count_at_least', 'has at least N items'],
-            ],
-            a.operator,
-          )}</select></label>${input('Expected JSON value', 'rule-value', JSON.stringify(a.value ?? null), 'Examples: false, 1500, ["connected", "vpn"]')}`
-        : a.type === 'packet'
-          ? `${input('Source IPv4', 'rule-source', a.source)}<div class="field-row"><label class="field">Protocol<select id="rule-protocol">${options(
-              ['udp', 'tcp', 'icmp', 'ospf'].map((x) => [x, x]),
-              a.protocol,
-            )}</select></label>${input('Destination port', 'rule-port', a.port)}</div><label class="field">Must be<select id="rule-decision">${options(
-              [
-                ['accept', 'accepted'],
-                ['drop', 'dropped'],
-              ],
-              a.decision,
-            )}</select></label>`
-          : a.type === 'peers'
-            ? `${input('Required router names', 'rule-targets', (Array.isArray(a.targets) ? a.targets : []).join(', '), 'Comma-separated inventory names')}<label class="toggle-row">Require matching reverse endpoints<input id="rule-reciprocal" type="checkbox" ${a.reciprocal ? 'checked' : ''}></label>`
-            : `${input('Filter chain', 'rule-chain', a.chain)}${input('Route prefix', 'rule-prefix', a.prefix)}<label class="field">Must be<select id="rule-decision">${options(
-                [
-                  ['accept', 'accepted'],
-                  ['reject', 'rejected'],
-                ],
-                a.decision,
-              )}</select></label>`;
-  content.innerHTML = `<div class="stage-intro"><h2>Design a reusable rule</h2><p>Scope the assertion, define what must hold, and save to run it against your semantic routers. Edit either the form or the definition.</p></div><div class="rule-author"><form id="rule-builder"><h3>Rule builder</h3>${input('Rule name', 'rule-name', rule.name)}${input('Roles (optional)', 'rule-scope', roles.join(', '), 'Comma-separated role names; blank selects every role')}${input('Specific router names (optional)', 'rule-names', (Array.isArray(rule.scope?.names) ? rule.scope.names : []).join(', '), 'Comma-separated names; combined with the role scope')}<label class="field">Assertion<select id="rule-kind">${options(
-    [
-      ['packet', 'Packet decision'],
-      ['field', 'Model field / collection'],
-      ['peers', 'Required BGP peerings'],
-      ['route', 'Route decision'],
-      ['expression', 'Custom logic'],
-    ],
-    a.type,
-  )}</select></label>${assertion}<label class="field">Parameters (JSON)<textarea id="rule-params" class="rule-parameters" spellcheck="false">${esc(JSON.stringify(rule.params || {}, null, 2))}</textarea></label><div class="field-row"><label class="field">Failure priority<select id="rule-severity">${options(
-    [
-      ['P1', 'P1'],
-      ['P2', 'P2'],
-    ],
-    rule.severity,
-  )}</select></label><label class="toggle-row">Enabled<input id="rule-enabled" type="checkbox" ${rule.enabled ? 'checked' : ''}></label></div><p class="helper">Array paths require every resolved item to satisfy the expectation. Empty matches fail; missing evidence stays unknown.</p></form><div>${codeEditor('rule-definition', definition(), 'Rule definition JSON')}<div class="inline-actions">${button('Duplicate', 'duplicate-rule')}${button('Delete', 'delete-rule')}${button('Download rule', 'download-rule')}</div></div></div><div id="ide-error" class="error-text" role="status"></div><div id="rule-draft-state" class="draft-state">${newRules.has(rule.id) ? 'New draft · save to include in test runs' : 'Saved definition · edits are validated before replacing it'}</div>`;
-  wireEditor('rule-definition', definition(), (text) => {
-    drafts.set(selectedRule, text);
-    builderDirty = false;
-    $('#rule-draft-state').textContent = 'Unsaved JSON draft · save to test';
+  mountDetails();
+  const unsubscribe = doc.subscribe(() => {
+    drafts.set(id, doc.text());
+    $('#rule-draft-state').textContent =
+      'Unsaved draft · save to validate and run tests';
+    mountDetails();
   });
-  if ($('#rule-path')) {
-    $('#rule-path').setAttribute('list', 'model-paths');
-    const list = document.createElement('datalist');
-    list.id = 'model-paths';
-    list.innerHTML = fields
-      .map((path) => `<option value="${esc(path)}"></option>`)
-      .join('');
-    $('#rule-builder').append(list);
-  }
-  $('#rule-builder').onsubmit = (event) => event.preventDefault();
-  $('#rule-builder').oninput = () => {
-    builderDirty = true;
-    $('#rule-draft-state').textContent = 'Unsaved form changes · save to test';
+  ruleViews.push({
+    destroy() {
+      unsubscribe();
+      for (const view of detailViews) view.destroy();
+    },
+  });
+  $('#duplicate-rule').onclick = () => {
     try {
-      const value = ruleFromForm();
-      drafts.set(selectedRule, JSON.stringify(value, null, 2));
-      $('#rule-definition').value = drafts.get(selectedRule);
-    } catch {
-      /* Incomplete JSON expected values are allowed while typing. */
+      const original = doc.getValue();
+      newRule(original.assert.type);
+      original.id = selectedRule;
+      original.name += ' (copy)';
+      newRules.set(selectedRule, original);
+      drafts.set(selectedRule, JSON.stringify(original, null, 2));
+      ruleDocuments.delete(selectedRule);
+      renderWorkbench();
+    } catch (error) {
+      $('#ide-error').textContent = error.message;
     }
   };
-  $('#rule-kind').onchange = () => {
-    const value = {
-      ...rule,
-      name: $('#rule-name').value,
-      assert: template($('#rule-kind').value),
-    };
-    drafts.set(selectedRule, JSON.stringify(value, null, 2));
-    renderWorkbench();
-  };
-  $('#duplicate-rule').onclick = () => {
-    const original = JSON.parse($('#rule-definition').value);
-    newRule(original.assert.type);
-    const id = selectedRule;
-    original.id = id;
-    original.name += ' (copy)';
-    newRules.set(id, original);
-    drafts.set(id, JSON.stringify(original, null, 2));
-    renderWorkbench();
-  };
   $('#delete-rule').onclick = async () => {
-    state.rules = state.rules.filter((r) => r.id !== selectedRule);
-    newRules.delete(selectedRule);
-    drafts.delete(selectedRule);
+    state.rules = state.rules.filter((rule) => rule.id !== id);
+    newRules.delete(id);
+    drafts.delete(id);
+    ruleDocuments.delete(id);
     selectedRule = null;
     state.revision++;
     persistRules();
@@ -762,84 +760,28 @@ function renderRule(content) {
   };
   $('#download-rule').onclick = () => {
     try {
-      download(selectedRule + '.rule.json', JSON.parse($('#rule-definition').value));
+      download(id + '.rule.json', doc.getValue());
     } catch (error) {
       $('#ide-error').textContent = error.message;
     }
-  };
-}
-function ruleFromForm() {
-  const existing = savedRule(),
-    kind = $('#rule-kind').value;
-  let assertion;
-  if (kind === 'expression')
-    assertion = { type: kind, test: JSON.parse($('#rule-expression').value) };
-  if (kind === 'field') {
-    const operator = $('#rule-operator').value;
-    assertion = { type: kind, path: $('#rule-path').value.trim(), operator };
-    if (operator !== 'exists') assertion.value = JSON.parse($('#rule-value').value);
-  }
-  if (kind === 'packet')
-    assertion = {
-      type: kind,
-      source: $('#rule-source').value.trim(),
-      protocol: $('#rule-protocol').value,
-      port: Number($('#rule-port').value),
-      decision: $('#rule-decision').value,
-    };
-  if (kind === 'peers')
-    assertion = {
-      type: kind,
-      targets: $('#rule-targets')
-        .value.split(',')
-        .map((s) => s.trim())
-        .filter(Boolean),
-      reciprocal: $('#rule-reciprocal').checked,
-    };
-  if (kind === 'route')
-    assertion = {
-      type: kind,
-      chain: $('#rule-chain').value.trim(),
-      prefix: $('#rule-prefix').value.trim(),
-      decision: $('#rule-decision').value,
-    };
-  const roles = $('#rule-scope')
-    .value.split(',')
-    .map((role) => role.trim())
-    .filter(Boolean);
-  return {
-    ...existing,
-    name: $('#rule-name').value.trim(),
-    scope: {
-      ...(roles.length ? { roles } : {}),
-      ...($('#rule-names').value.trim()
-        ? {
-            names: $('#rule-names')
-              .value.split(',')
-              .map((name) => name.trim())
-              .filter(Boolean),
-          }
-        : {}),
-    },
-    assert: assertion,
-    params: JSON.parse($('#rule-params').value),
-    severity: $('#rule-severity').value,
-    enabled: $('#rule-enabled').checked,
   };
 }
 async function saveRule() {
   const revision = state.revision;
   const id = selectedRule;
   try {
-    const candidate = builderDirty
-      ? ruleFromForm()
-      : JSON.parse($('#rule-definition').value);
+    const doc = ruleDocument();
+    const candidate = doc.getValue();
     if (candidate.id !== id)
       throw new Error('Keep the rule id unchanged; duplicate to create another file.');
     const rules = state.rules.filter((r) => r.id !== id).concat(candidate);
     await callEngine('rules_validate', { rules });
     if (state.revision !== revision)
       throw new Error('The rule list changed while saving. Please try again.');
+    if (!doc.valid || JSON.stringify(doc.getValue()) !== JSON.stringify(candidate))
+      throw new Error(
+        'The draft changed while validating. Save again to include your latest edits.',
+      );
     state.rules = rules;
     newRules.delete(id);
     drafts.set(id, JSON.stringify(candidate, null, 2));
@@ -940,6 +882,7 @@ function renderExport(content) {
 export function resetWorkbench() {
   selectedRule = null;
   drafts.clear();
+  ruleDocuments.clear();
   newRules.clear();
   sourceDrafts.clear();
   modelDrafts.clear();
