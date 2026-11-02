@@ -31,6 +31,103 @@ const fields = [
   'platform.family',
 ];
 
+const testTypes = [
+  [
+    'field',
+    'Model assertion',
+    'Compare model fields and collections',
+    '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/>',
+  ],
+  [
+    'packet',
+    'Packet decision',
+    'Check how an input packet is handled',
+    '<rect x="3" y="7" width="10" height="10" rx="2"/><path d="M13 12h8m-3-3 3 3-3 3M6 10h4"/>',
+  ],
+  [
+    'peers',
+    'Required peerings',
+    'Require matching BGP peer definitions',
+    '<rect x="2" y="8" width="6" height="8" rx="1"/><rect x="16" y="8" width="6" height="8" rx="1"/><path d="M8 10h8m-3-3 3 3-3 3M16 14H8m3-3-3 3 3 3"/>',
+  ],
+  [
+    'route',
+    'Route decision',
+    'Check a route against a filter chain',
+    '<path d="M5 20V8a3 3 0 0 1 3-3h11m-4-4 4 4-4 4M5 13h9a3 3 0 0 1 3 3v4"/><circle cx="5" cy="20" r="1"/><circle cx="17" cy="20" r="1"/>',
+  ],
+  [
+    'expression',
+    'Custom logic',
+    'Combine conditions and cross-router tests',
+    '<path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-13-2 16"/>',
+  ],
+];
+const testTypeIcon = (paths) =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${paths}</svg>`;
+let pickerDocument;
+
+/** Native disclosure semantics provide keyboard opening; choices are ordinary buttons.
+ * Close on selection, Escape, outside clicks, or focus leaving the picker. */
+function initializeTestTypePicker() {
+  const picker = $('#new-rule-picker');
+  const trigger = $('#new-rule-trigger');
+  const choose = (kind) => {
+    const selected = testTypes.find((type) => type[0] === kind) || testTypes[0];
+    $('#new-rule-kind').value = selected[0];
+    $('#new-rule-label').textContent = selected[1];
+    $('#new-rule-icon').innerHTML = testTypeIcon(selected[3]);
+    $('#new-rule-options').innerHTML = testTypes
+      .map(
+        ([id, label, description, icon]) =>
+          `<button type="button" data-test-kind="${id}" class="test-type-option${id === selected[0] ? ' selected' : ''}" aria-pressed="${id === selected[0]}"><span class="test-type-icon">${testTypeIcon(icon)}</span><span><strong>${label}</strong><small>${description}</small></span><span class="type-check" aria-hidden="true">${id === selected[0] ? '✓' : ''}</span></button>`,
+      )
+      .join('');
+    $('#new-rule-options')
+      .querySelectorAll('[data-test-kind]')
+      .forEach((button) => {
+        button.onclick = () => {
+          choose(button.dataset.testKind);
+          picker.open = false;
+          trigger.focus();
+        };
+      });
+  };
+  choose($('#new-rule-kind').value || 'field');
+  // Prefer the side with enough viewport room; keep long menus scrollable.
+  picker.ontoggle = () => {
+    if (!picker.open) return;
+    picker.classList.toggle('opens-up', false);
+    const options = $('#new-rule-options');
+    options.style.maxHeight = '';
+    const anchor = trigger.getBoundingClientRect();
+    const below = window.innerHeight - anchor.bottom - 12;
+    const above = anchor.top - 12;
+    const opensUp = options.offsetHeight > below && above > below;
+    picker.classList.toggle('opens-up', opensUp);
+    options.style.maxHeight = Math.max(80, opensUp ? above : below) + 'px';
+  };
+  picker.onkeydown = (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      picker.open = false;
+      trigger.focus();
+    }
+  };
+  picker.onfocusout = () =>
+    setTimeout(() => {
+      if (!picker.contains(document.activeElement)) picker.open = false;
+    }, 0);
+  if (pickerDocument !== document) {
+    document.addEventListener('pointerdown', (event) => {
+      const currentPicker = $('#new-rule-picker');
+      if (currentPicker && !currentPicker.contains(event.target))
+        currentPicker.open = false;
+    });
+    pickerDocument = document;
+  }
+}
+
 /** Seed a new assertion with domain examples, not executable code. */
 function template(kind) {
   const assertions = {
@@ -147,6 +244,7 @@ export function initializeWorkbench(data, callbacks) {
     overview = true;
     renderWorkbench();
   };
+  initializeTestTypePicker();
   $('#new-rule').onclick = () => newRule($('#new-rule-kind').value);
   $('#suite-example').innerHTML =
     '<option value="">Choose an optional starting point…</option>' +
@@ -293,6 +391,8 @@ export function renderWorkbench() {
     $('#' + id).setAttribute('aria-pressed', String(active));
   }
   $('#config-workbench').hidden = overview;
+  $('#test-design').hidden = overview || stage !== 'rules';
+  if (overview || stage !== 'rules') $('#new-rule-picker').open = false;
   $('#ide-flow').innerHTML = ['rules', 'source', 'model', 'tests', 'export']
     .map(
       (name, index) =>

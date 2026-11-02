@@ -52,15 +52,15 @@ downloads pinned Pyodide assets once; generated pages serve the Python runtime a
 middleware from the same origin. System fonts require no external stylesheet.
 
 The workbench starts with **test design → source → semantic model → run tests →
-export**. Active rules are prominent choices above the editor, with per-rule Run
-switches. A fresh workspace has no active rules. Add an optional example suite or create
-your own; importing configs never enables hidden checks. Every assertion, scope,
-parameter and priority is editable. Select a router, edit its source or model, and
-define reusable rules using a form or JSON. Rules can assert model fields/collections,
-ordered input-firewall decisions, reciprocal BGP peerings, and route-filter decisions.
-Scope them to roles or named routers. Save a rule to evaluate it against the current
-models; inspect pass, fail, unknown and skipped results with links back to the rule or
-source evidence.
+export**. Active rules are prominent choices inside step 1, with per-rule Run switches.
+A fresh workspace has no active rules. Add an optional example suite or create your own;
+importing configs never enables hidden checks. Every assertion, scope, parameter and
+priority is editable. Select a router, edit its source or model, and define reusable
+rules using a form or JSON. Rules can assert model fields/collections, ordered
+input-firewall decisions, reciprocal BGP peerings, and route-filter decisions. Scope
+them to roles or named routers. Save a rule to evaluate it against the current models;
+inspect pass, fail, unknown and skipped results with links back to the rule or source
+evidence.
 
 Saved rules persist in this browser. Download a workspace to retain models, rule files,
 policy and attached sources together. Model edits rerun assertions without reparsing

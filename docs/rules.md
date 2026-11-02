@@ -1,11 +1,13 @@
 # Rule authoring and the configuration workflow
 
 The workbench starts with **Test design**, followed by source, semantic model, test
-results and export. The main test panel shows every active rule, its result counts and a
-Run switch. No checks run in a separate hidden path. New workspaces start empty; loading
-configs selects no policy. Create a test, import a suite JSON, or explicitly choose an
-optional example suite. Adding examples preserves existing definitions with the same ID.
-Every rule, including the estate examples, can be edited, disabled or deleted.
+results and export. The rule list and creation controls sit inside step 1, below the
+workflow navigation, and are hidden in steps 2–5. The test panel shows every active
+rule, its result counts and a Run switch. No checks run in a separate hidden path. New
+workspaces start empty; loading configs selects no policy. Create a test, import a suite
+JSON, or explicitly choose an optional example suite. Adding examples preserves existing
+definitions with the same ID. Every rule, including the estate examples, can be edited,
+disabled or deleted.
 
 Source and model drafts apply only after parsing/validation. Rule drafts become active
 only after **Save rule → run tests** validates them. The Python engine evaluates

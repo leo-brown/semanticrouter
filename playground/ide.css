@@ -70,13 +70,11 @@ body:not(.network-overview) .metrics strong {
 .network-overview .workspace-grid {
   margin-top: 1.25rem;
 }
-/* Test selection is the main design surface, ahead of config/model editing. */
+/* Test selection belongs to step 1, below the persistent workflow navigation. */
 .test-design {
   background: white;
-  border: 1px solid var(--line);
-  border-radius: 0.4375rem;
+  border-bottom: 1px solid var(--line);
   padding: 1rem;
-  margin-bottom: 1rem;
 }
 .network-overview .test-design {
   display: none;
@@ -194,7 +192,7 @@ body:not(.network-overview) .metrics strong {
   background: #fff;
   border: 1px solid #d2dfd8;
   border-radius: 0.4375rem;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 0.125rem 0.4375rem #19352a06;
 }
 .ide-flow {
@@ -638,4 +636,145 @@ body:not(.network-overview) .metrics strong {
 }
 .rule-run input {
   accent-color: var(--teal);
+}
+
+/* Keep inventory reachable while the main editor scrolls. The bounded sidebar
+   scrolls independently, so short screens can still reach every router/control. */
+.sidebar {
+  position: sticky;
+  top: 5.3125rem;
+  align-self: start;
+  height: calc(100vh - 5.3125rem);
+  height: calc(100dvh - 5.3125rem);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.ide-flow {
+  border-radius: 0.4375rem 0.4375rem 0 0;
+}
+.ide-status {
+  border-radius: 0 0 0.4375rem 0.4375rem;
+}
+.test-type-picker {
+  position: relative;
+  min-width: 12rem;
+  max-width: 100%;
+}
+.test-type-picker summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2rem;
+  padding: 0.45rem 0.6rem;
+  list-style: none;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: 0.3rem;
+  background: white;
+  font-size: 0.7rem;
+}
+.test-type-picker summary::-webkit-details-marker {
+  display: none;
+}
+.test-type-picker summary::marker {
+  content: '';
+}
+.test-type-picker summary:focus-visible,
+.test-type-option:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+.test-type-icon {
+  display: inline-flex;
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--teal);
+}
+.test-type-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.picker-chevron {
+  width: 0.8rem;
+  height: 0.8rem;
+  margin-left: auto;
+  color: var(--muted);
+}
+.test-type-picker[open] .picker-chevron {
+  transform: rotate(180deg);
+}
+.test-type-options {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 40;
+  width: 20rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.3rem;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  box-shadow: 0 0.4rem 1.5rem #192b3226;
+}
+.test-type-option {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.6rem;
+  border: 0;
+  border-radius: 0.3rem;
+  background: white;
+  text-align: left;
+  color: var(--ink);
+}
+.test-type-option:hover,
+.test-type-option:focus-visible {
+  background: #f0f6f3;
+}
+.test-type-option.selected {
+  background: #e6f2ed;
+}
+.test-type-option strong {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.test-type-option small {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.6rem;
+  line-height: 1.4;
+}
+.type-check {
+  margin-left: auto;
+  color: var(--teal);
+  font-size: 0.8rem;
+}
+@media (max-width: 56.25em) {
+  .sidebar {
+    top: 4.625rem;
+    height: auto;
+    overflow: visible;
+    scrollbar-gutter: auto;
+    z-index: 15;
+  }
+  .test-type-options {
+    left: 0;
+    right: auto;
+  }
+}
+
+.test-type-options {
+  max-height: min(22rem, 60dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.test-type-picker.opens-up .test-type-options {
+  top: auto;
+  bottom: calc(100% + 0.35rem);
 }

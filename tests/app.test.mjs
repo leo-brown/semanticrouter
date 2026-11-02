@@ -18,6 +18,12 @@ test('standalone startup, JSON edit and reset work through the real module graph
     dataset: { tab },
     classList: { toggle() {} },
   }));
+  const stages = ['rules', 'source', 'model', 'tests', 'export'].map((stage) => ({
+    dataset: { stage },
+  }));
+  const typeOptions = ['field', 'packet', 'peers', 'route', 'expression'].map(
+    (testKind) => ({ dataset: { testKind } }),
+  );
   const ruleToggle = { dataset: { enableRule: 'snmp' }, checked: true };
   const element = (selector) => {
     if (!elements.has(selector))
@@ -28,9 +34,16 @@ test('standalone startup, JSON edit and reset work through the real module graph
         hidden: true,
         classList: { toggle() {} },
         setAttribute() {},
+        focus() {},
+        contains() {
+          return false;
+        },
         append() {},
         parentElement: { querySelector: () => ({ textContent: '' }) },
         querySelectorAll(query) {
+          if (selector === '#ide-flow' && query === '[data-stage]') return stages;
+          if (selector === '#new-rule-options' && query === '[data-test-kind]')
+            return typeOptions;
           if (selector === '#rule-files' && query === '[data-enable-rule]')
             return [ruleToggle];
           return [];
@@ -41,6 +54,7 @@ test('standalone startup, JSON edit and reset work through the real module graph
   globalThis.document = {
     body: { dataset: {}, classList: { toggle() {} } },
     querySelector: element,
+    addEventListener() {},
     createElement: () => ({ innerHTML: '' }),
     querySelectorAll(selector) {
       return selector === '[data-tab]' ? tabs : [];
@@ -126,6 +140,38 @@ test('standalone startup, JSON edit and reset work through the real module graph
     await import('../playground/app.js');
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(state.engineReady, true);
+    assert.equal(
+      element('#test-design').hidden,
+      false,
+      'rule choices belong to step 1',
+    );
+    stages.find((button) => button.dataset.stage === 'model').onclick();
+    assert.equal(
+      element('#test-design').hidden,
+      true,
+      'rule catalog is hidden outside test design',
+    );
+    stages.find((button) => button.dataset.stage === 'rules').onclick();
+    assert.equal(element('#test-design').hidden, false);
+    assert.equal(element('#new-rule-kind').value, 'field');
+    element('#new-rule-picker').open = true;
+    typeOptions.find((button) => button.dataset.testKind === 'peers').onclick();
+    assert.equal(element('#new-rule-kind').value, 'peers');
+    assert.equal(element('#new-rule-label').textContent, 'Required peerings');
+    assert.match(element('#new-rule-icon').innerHTML, /<svg/);
+    assert.equal(
+      element('#new-rule-picker').open,
+      false,
+      'selection closes the picker',
+    );
+    element('#new-rule-picker').open = true;
+    element('#new-rule-picker').onkeydown({ key: 'Escape', preventDefault() {} });
+    assert.equal(
+      element('#new-rule-picker').open,
+      false,
+      'Escape dismisses the picker',
+    );
+
     assert.match(
       element('#network-map').innerHTML,
       /unvalidated/,

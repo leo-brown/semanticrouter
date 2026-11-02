@@ -107,50 +107,72 @@
         </div>
         <div id="notice" class="notice" role="status" hidden></div>
 
-        <section class="test-design" aria-label="Active test suite">
-          <div class="test-design-heading">
-            <div>
-              <div class="eyebrow">START WITH INTENT</div>
-              <h2>Test design <span id="rule-file-count"></span></h2>
-              <p>
-                Choose the rules this network must satisfy. Every check is yours to
-                edit.
-              </p>
-            </div>
-            <div class="inline-actions">
-              <button id="import-suite" class="button">Import suite</button
-              ><button id="download-suite" class="button">Download suite</button
-              ><input id="suite-input" type="file" accept=".json" hidden />
-            </div>
-          </div>
-          <div class="suite-actions">
-            <div>
-              <select id="suite-example" aria-label="Optional example suite"></select
-              ><button id="add-example" class="button">Add example suite</button>
-            </div>
-            <div>
-              <select id="new-rule-kind" aria-label="New rule template">
-                <option value="field">Model assertion</option>
-                <option value="packet">Packet decision</option>
-                <option value="peers">Required peerings</option>
-                <option value="route">Route decision</option>
-                <option value="expression">Custom logic</option></select
-              ><button id="new-rule" class="button primary">+ Create test</button>
-            </div>
-          </div>
-          <div id="rule-files" class="test-catalog"></div>
-          <p class="helper">
-            Only these saved rules run. Examples are optional; importing configs never
-            enables policy.
-          </p>
-        </section>
-
         <section
           id="config-workbench"
           class="config-workbench"
           aria-label="Configuration workflow"
         >
           <nav id="ide-flow" class="ide-flow" aria-label="Configuration stages"></nav>
+          <section id="test-design" class="test-design" aria-label="Active test suite">
+            <div class="test-design-heading">
+              <div>
+                <div class="eyebrow">START WITH INTENT</div>
+                <h2>Test design <span id="rule-file-count"></span></h2>
+                <p>
+                  Choose the rules this network must satisfy. Every check is yours to
+                  edit.
+                </p>
+              </div>
+              <div class="inline-actions">
+                <button id="import-suite" class="button">Import suite</button
+                ><button id="download-suite" class="button">Download suite</button
+                ><input id="suite-input" type="file" accept=".json" hidden />
+              </div>
+            </div>
+            <div class="suite-actions">
+              <div>
+                <select id="suite-example" aria-label="Optional example suite"></select
+                ><button id="add-example" class="button">Add example suite</button>
+              </div>
+              <div>
+                <input id="new-rule-kind" type="hidden" value="field" />
+                <details id="new-rule-picker" class="test-type-picker">
+                  <summary id="new-rule-trigger">
+                    <span
+                      id="new-rule-icon"
+                      class="test-type-icon"
+                      aria-hidden="true"
+                    ></span>
+                    <span id="new-rule-label">Model assertion</span>
+                    <svg
+                      class="picker-chevron"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </summary>
+                  <div
+                    id="new-rule-options"
+                    class="test-type-options"
+                    role="group"
+                    aria-label="Test type"
+                  ></div>
+                </details>
+                <button id="new-rule" class="button primary">+ Create test</button>
+              </div>
+            </div>
+            <div id="rule-files" class="test-catalog"></div>
+            <p class="helper">
+              Only these saved rules run. Examples are optional; importing configs never
+              enables policy.
+            </p>
+          </section>
+
           <div class="ide-toolbar">
             <span id="ide-filepath"></span
             ><button id="ide-primary" class="button primary">Parse → model</button>
