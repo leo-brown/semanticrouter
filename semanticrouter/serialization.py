@@ -7,7 +7,7 @@ from dataclasses import fields, is_dataclass
 from types import UnionType
 from typing import Union, get_args, get_origin, get_type_hints
 
-from .model import Platform, Router
+from .model import Interface, Platform, Router
 
 
 def _decode(kind, value, path):
@@ -60,7 +60,16 @@ def _decode(kind, value, path):
             for key, item in value.items()
         }
         try:
-            return kind(**decoded)
+            result = kind(**decoded)
+            if kind is Interface:
+                # A missing key in an old workspace is not an explicit null edit.
+                result._absent_projections = tuple(
+                    item.name
+                    for item in fields(Interface)
+                    if item.metadata.get("inherit_source_if_absent")
+                    and item.name not in value
+                )
+            return result
         except TypeError as exc:
             raise ValueError(f"{path}: missing required fields") from exc
     if type(value) is not kind:

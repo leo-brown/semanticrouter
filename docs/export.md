@@ -16,6 +16,20 @@ to the pre-7.20 format. Explicit targets are checked for the known BGP layout bo
 describes the 7.20 instance change. Its native-export definition is
 `semanticrouter/firmware/routeros-7.20.json`.
 
+Interface mappings include explicit bridge `vlan-filtering` as nullable boolean
+`interfaces[].vlan_filtering`, and Ethernet `advertise` as nullable string list
+`interfaces[].advertised_link_modes`. An omitted setting stays null; advertised modes
+can be an explicitly empty list. Changing a typed value updates its original statement
+and retains its other properties and physical-port selector. Explicit null removes a
+mapped setting without guessing a replacement device default.
+
+Older JSON workspaces omit these new fields. Hydration records that absence privately;
+source-aware export fills only those missing values from the pinned original, on a copy.
+Explicit null values in a current workspace remain edits. Re-serializing an older model
+preserves absent fields until they are supplied, preventing accidental deletion during
+schema upgrades. Interface names may change because source anchors identify the
+statements.
+
 ## Automatic comparison
 
 Every successful complete source-aware export checks both:

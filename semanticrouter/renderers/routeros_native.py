@@ -7,6 +7,7 @@ recover the requested functional model before completeness is reported.
 """
 
 import re
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 
 from ..adapters.routeros.parser import parse
@@ -291,6 +292,12 @@ def interface(item):
         raise UnsupportedExport(
             "This interface needs a complete native source definition: " + item.kind
         )
+    if item.vlan_filtering is not None and item.kind != "bridge":
+        raise UnsupportedExport("VLAN filtering belongs to a bridge interface.")
+    if item.advertised_link_modes is not None and item.kind != "ethernet":
+        raise UnsupportedExport(
+            "Advertised link modes belong to an Ethernet interface."
+        )
     return "/interface " + item.kind, {
         "name": item.name,
         "disabled": _enabled(item),
@@ -299,7 +306,33 @@ def interface(item):
         "interface": item.parent,
         "vlan-id": item.vlan,
         "comment": item.comment or None,
+        "vlan-filtering": "yes"
+        if item.vlan_filtering is True
+        else "no"
+        if item.vlan_filtering is False
+        else None,
+        "advertise": ",".join(item.advertised_link_modes)
+        if item.advertised_link_modes is not None
+        else None,
     }
+
+
+def restore_legacy_interface_projections(router, before):
+    """Expand absent fields from a pinned original without mutating the caller.
+
+    JSON workspaces predating a typed projection could not request edits to it.
+    Source anchors, rather than interface names, survive deliberate renames. A new
+    interface has no original to inherit. Explicit nulls are never filled in.
+    """
+    router = deepcopy(router)
+    originals = {item.source.line: item for item in before.interfaces if item.source}
+    for item in router.interfaces:
+        original = originals.get(item.source.line) if item.source else None
+        for name in getattr(item, "_absent_projections", ()):
+            if original is not None and getattr(item, name) is None:
+                setattr(item, name, deepcopy(getattr(original, name)))
+        item._absent_projections = ()
+    return router
 
 
 def firewall(item, path="/ip firewall filter"):
@@ -423,6 +456,7 @@ def render_complete(router, version, source, source_version=None):
             "Complete source-aware export requires a configuration snapshot, not an executable edit script."
         )
     before = adapter.to_common()
+    router = restore_legacy_interface_projections(router, before)
     layout = definition("routeros-7.20")
     modern = before.platform.family != "6" and any(
         item.path == layout["native_marker"] for item in adapter.commands

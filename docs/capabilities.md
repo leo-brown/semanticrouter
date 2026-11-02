@@ -19,30 +19,37 @@ translation logic lives in the adapter, not in the policy tests.
   `# <Removed ROS Timestamp>`. Eight routing nodes have RouterOS 7 syntax evidence; four
   switches have insufficient evidence. None yields an exact version.
 - Non-executing parser only: this is an export reader, not a RouterOS script engine. It
-  cannot evaluate arbitrary scripts, device-dependent selectors or runtime state.
-  Commands/properties outside export coverage remain explicitly unexported.
+  cannot evaluate arbitrary scripts, device-dependent selectors or runtime state. Native
+  settings are retained for complete source-aware RouterOS export. Unsupported
+  predicates remain unknown to tests; portable conversion limits are tracked separately.
 - This release does not reconstruct arbitrary ordered `add/set/remove` edit scripts.
   Supply a device export snapshot. `set` support is for exported settings, BGP defaults,
   interface metadata and named PPP profiles; selector ambiguity is reported.
 
 ## Capabilities
 
-| Feature                                                     | RouterOS 6/7 import                       | RouterOS 7.1–7.19 export                                  | Cisco IOS 15 export                       |
-| ----------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------- | ----------------------------------------- |
-| Identity, DNS                                               | Yes                                       | Supported fields                                          | Supported fields                          |
-| IPv4 input/other filter rules and address groups            | Yes, unknown predicates opaque            | Supported predicates/actions                              | Input ACL artifact, restricted predicates |
-| IPv4 addressing                                             | Yes, including host-style loopbacks/peers | Ordinary addresses; host-peer semantics block full export | Not yet                                   |
-| BGP peers, inheritance, simple route policies               | Yes                                       | Supported fields and grammar                              | Not yet                                   |
-| Interfaces/bonds/VLANs, PPPoE/profiles, RADIUS, SNMP        | Inspection subset                         | Not yet                                                   | Not yet                                   |
-| OSPF interface templates                                    | Interface-name inspection                 | Not yet                                                   | Not yet                                   |
-| Arbitrary scripts, NAT/raw/mangle, DHCP, MPLS/VPLS, bridges | Preserved as uncovered source references  | Not yet                                                   | Not yet                                   |
+| Feature                         | Semantic inspection                                                                        | Complete RouterOS source export                             | Portable conversion                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------- | ------------------------------------- |
+| Identity, DNS                   | Explicit settings                                                                          | Preserved and editable                                      | Supported fields                      |
+| IPv4/IPv6 firewall              | Ordered rules, opaque unknown predicates                                                   | Preserved; mapped edits verified                            | Restricted IPv4 predicates/actions    |
+| IPv4 addresses                  | Includes host-style loopbacks/peers                                                        | Preserved and editable                                      | Ordinary addresses only               |
+| BGP and route filters           | Inheritance, peers, supported route predicates                                             | Native policies/settings retained; mapped edits verified    | Supported subset and firmware layouts |
+| Bridges, Ethernet, bonds, VLANs | Name/state, members, VLAN parent/id, bridge VLAN filtering, advertised Ethernet link modes | Native settings retained; mapped edits verified             | No interface conversion yet           |
+| PPPoE/profiles, RADIUS, SNMP    | Explicit service settings; credentials excluded                                            | Complete native definitions retained; mapped edits verified | No service conversion yet             |
+| OSPF templates                  | Interface-name inspection                                                                  | Complete native definitions retained                        | No OSPF conversion yet                |
+| Other native settings/scripts   | Not all have typed interpretations                                                         | Retained as native statements                               | Requires target mappings              |
 
-The common model mirrors the vendor feature domains, not every vendor property. Omitted
-defaults and unmodelled behavior remain a material limitation. A `complete` export means
-all imported configuration commands are covered by the supported semantic mapping; it
-does not certify a deployable configuration or recreate hidden defaults. The initial
-renderers produce configuration additions for a prepared target, not idempotent
-reconciliation or an in-place update of an existing router.
+RouterOS is the primary export workflow. It does not require an equivalent setting on
+another vendor. `source` preserves the original RouterOS syntax and verifies both the
+requested semantic model and all native statements. This is different from proving that
+every native setting has a typed interpretation or that every policy predicate can be
+evaluated. New typed feature mappings can be added without losing native data.
+
+The legacy `Router.unexported` field counts **portable conversion** gaps. It is not a
+list of statements missing from complete RouterOS output. The browser only shows those
+gaps when a separate conversion target is selected. Portable renderers refuse complete
+conversion when they lack a target mapping. No export reconstructs hidden device
+defaults or guarantees application to a particular live router.
 
 ## Migration examples
 

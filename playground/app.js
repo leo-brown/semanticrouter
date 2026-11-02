@@ -185,26 +185,36 @@ async function probe(target, values) {
 /** Request a target/version rendering with explicit partial-fragment consent.
  * Unsupported conversions render diagnostics; downloading is a separate user action. */
 function bindExport() {
-  $('#export-vendor').onchange = () =>
-    ($('#export-version').value =
-      $('#export-vendor').value === 'routeros' ? 'source' : '15.2');
+  $('#export-vendor').onchange = () => {
+    const native = $('#export-vendor').value === 'routeros';
+    $('#export-version').value = native ? 'source' : '15.2';
+    $('#export-partial-option').hidden = native;
+    $('#export-partial').checked = false;
+    $('#export-result').innerHTML = '';
+  };
   $('#export-form').onsubmit = async (event) => {
     event.preventDefault();
     const box = $('#export-result');
     box.textContent = 'Rendering with Python…';
     try {
+      const name = current().name;
+      const vendor = $('#export-vendor').value;
+      const version = $('#export-version').value.trim();
       const result = await exportModel({
-        vendor: $('#export-vendor').value,
-        version: $('#export-version').value.trim(),
+        vendor,
+        version,
         partial: $('#export-partial').checked,
       });
+      if (
+        current().name !== name ||
+        $('#export-vendor').value !== vendor ||
+        $('#export-version').value.trim() !== version
+      )
+        return;
       state.exportResult = result;
-      box.innerHTML = `<div class="model-note">${result.complete ? 'All represented features covered. Review target defaults and attachment before deployment.' : 'PARTIAL FRAGMENT · This is not a replacement device configuration.'}</div><pre class="result-box">${esc(result.text)}</pre>${result.diagnostics.length ? `<div class="error-text">${result.diagnostics.map(esc).join('\n')}</div>` : ''}<button id="download-export" class="button small">↓ Download fragment</button>`;
+      box.innerHTML = `<div class="model-note">${result.complete ? (result.mode === 'source-aware' ? 'Complete RouterOS configuration · semantic round trip and native statements verified.' : 'Complete supported model conversion.') : 'PARTIAL FRAGMENT · This is not a replacement device configuration.'}</div><pre class="result-box">${esc(result.text)}</pre>${result.diagnostics.length ? `<div class="error-text">${result.diagnostics.map(esc).join('\n')}</div>` : ''}<button id="download-export" class="button small">↓ Download ${result.complete ? 'configuration' : 'fragment'}</button>`;
       $('#download-export').onclick = () =>
-        download(
-          current().name + ($('#export-vendor').value === 'routeros' ? '.rsc' : '.ios'),
-          result.text,
-        );
+        download(name + (vendor === 'routeros' ? '.rsc' : '.ios'), result.text);
     } catch (error) {
       box.innerHTML = `<div class="error-text">Export blocked:\n${esc(error.message)}</div>`;
     }

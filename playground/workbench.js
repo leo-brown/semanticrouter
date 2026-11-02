@@ -839,29 +839,49 @@ function changes(router) {
   walk(baseline, router, '');
   return found;
 }
+/** Portable conversion limits are relevant only when leaving RouterOS syntax.
+ * The legacy unexported list is not a native export omission counter. */
+function conversionGaps(router) {
+  if (!router.unexported.length) return '';
+  return `<details id="ide-conversion-gaps" class="conversion-gaps" hidden><summary>${router.unexported.length} statements need target conversion mappings</summary><p class="helper">These statements cannot be translated by the portable converter. Complete RouterOS export retains their native settings.</p>${router.unexported.map((source) => `<button class="gap-line" data-gap="${source.line}">${esc(source.path.split('/').pop())}:${source.line}<code>${esc((state.sources[router.name] || '').split('\n')[source.line - 1] || 'Load the source to inspect this statement')}</code></button>`).join('')}</details>`;
+}
+
+/** Render actual export proof only after the engine has verified the output. */
+function exportVerification(proof = {}) {
+  if (!proof.semantic_match) return '';
+  return `<div class="test-totals"><span class="test-status pass">Model round trip matched</span>${proof.native_statement_match ? '<span class="test-status pass">All RouterOS statements accounted for</span>' : ''}</div>${proof.input_statements !== undefined ? `<p class="helper">${proof.input_statements} input statements · ${proof.output_statements} generated statements</p>` : ''}`;
+}
+
 function renderExport(content) {
   const r = current();
-  content.innerHTML = `<div class="stage-intro"><h2>Review the config output</h2><p>Render this model for a target platform. The output is a review artifact; it is never applied to a device.</p></div><form id="ide-export-form"><div class="field-row"><label class="field">Vendor<select id="ide-vendor"><option value="routeros">RouterOS</option><option value="cisco-ios">Cisco IOS ACL</option></select></label>${input('Target version', 'ide-version', 'source', 'source keeps the original RouterOS syntax')}</div><label id="ide-partial-option" class="toggle-row" hidden>Allow a clearly labelled conversion fragment<input id="ide-partial" type="checkbox"></label></form><div id="ide-export-result" role="status"></div><details class="conversion-gaps"><summary>${r.unexported.length} statements outside semantic translation coverage</summary><p class="helper">These statements are retained in a complete RouterOS export. Translating them to another platform needs semantic mappings.</p>${r.unexported.map((source) => `<button class="gap-line" data-gap="${source.line}">${esc(source.path.split('/').pop())}:${source.line}<code>${esc((state.sources[r.name] || '').split('\n')[source.line - 1] || 'Source text not attached — load the export to inspect this statement')}</code></button>`).join('')}</details><div id="ide-error" class="error-text" role="status"></div>`;
+  content.innerHTML = `<div class="stage-intro"><h2>Review the config output</h2><p>Render this model for a target platform. The output is a review artifact; it is never applied to a device.</p></div><form id="ide-export-form"><div class="field-row"><label class="field">Vendor<select id="ide-vendor"><option value="routeros">RouterOS</option><option value="cisco-ios">Cisco IOS ACL</option></select></label>${input('Target version', 'ide-version', 'source', 'source keeps the original RouterOS syntax')}</div><label id="ide-partial-option" class="toggle-row" hidden>Allow a clearly labelled conversion fragment<input id="ide-partial" type="checkbox"></label></form><div id="ide-export-result" role="status"></div>${conversionGaps(r)}<div id="ide-error" class="error-text" role="status"></div>`;
   $('#ide-vendor').onchange = () => {
-    $('#ide-version').value = $('#ide-vendor').value === 'routeros' ? 'source' : '15.2';
-    $('#ide-partial-option').hidden = $('#ide-vendor').value === 'routeros';
+    const native = $('#ide-vendor').value === 'routeros';
+    $('#ide-version').value = native ? 'source' : '15.2';
+    $('#ide-partial-option').hidden = native;
+    if ($('#ide-conversion-gaps')) $('#ide-conversion-gaps').hidden = native;
+    // A successful preview belongs to its target; clear it on target changes.
+    $('#ide-export-result').innerHTML = '';
+    $('#ide-error').textContent = '';
     $('#ide-partial').checked = false;
   };
   $('#ide-export-form').onsubmit = async (event) => {
     event.preventDefault();
     try {
       const vendor = $('#ide-vendor').value;
+      const version = $('#ide-version').value.trim();
       const result = await exportModel({
         vendor,
-        version: $('#ide-version').value.trim(),
+        version,
         partial: $('#ide-partial').checked,
       });
-      const proof = result.verification || {};
-      const verified = proof.semantic_match
-        ? `<div class="test-totals"><span class="test-status pass">Model round trip matched</span>${proof.native_statement_match ? '<span class="test-status pass">Native statement coverage matched</span>' : ''}</div>${proof.input_statements !== undefined ? `<p class="helper">${proof.input_statements} input statements · ${proof.output_statements} generated statements</p>` : ''}`
-        : '';
+      if (
+        $('#ide-vendor').value !== vendor ||
+        $('#ide-version').value.trim() !== version
+      )
+        return;
       $('#ide-export-result').innerHTML =
-        verified +
+        exportVerification(result.verification) +
         `<p class="export-state">${result.complete ? (result.mode === 'source-aware' ? 'Complete RouterOS configuration — model and native statements verified' : 'Complete supported model conversion') : 'Partial output — review the omitted statements below'}</p><pre class="result-box">${esc(result.text)}</pre><div class="error-text">${result.diagnostics.map(esc).join('\n')}</div>${button('Download configuration', 'ide-download-export')}`;
       $('#ide-download-export').onclick = () =>
         download(r.name + (vendor === 'routeros' ? '.rsc' : '.ios'), result.text);

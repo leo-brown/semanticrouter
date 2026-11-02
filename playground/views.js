@@ -186,7 +186,19 @@ function renderObjects(r) {
         .map((i) =>
           kv(
             i.name,
-            [i.kind, i.mode, !i.enabled ? 'disabled' : ''].filter(Boolean).join(' · '),
+            [
+              i.kind,
+              i.mode,
+              i.vlan_filtering == null
+                ? ''
+                : 'VLAN filtering ' + (i.vlan_filtering ? 'enabled' : 'disabled'),
+              i.advertised_link_modes == null
+                ? ''
+                : 'Advertise ' + (i.advertised_link_modes.join(', ') || 'none'),
+              !i.enabled ? 'disabled' : '',
+            ]
+              .filter(Boolean)
+              .join(' · '),
           ),
         )
         .join(''),
@@ -215,11 +227,6 @@ function renderObjects(r) {
       ) +
         kv('Location', r.snmp_location || 'not set') +
         kv('DNS', r.dns.join(', ') || 'not set'),
-    ) +
-    card(
-      'Conversion support',
-      r.unexported.length + ' conversion gaps',
-      '<p class="helper">Open Export in the config flow to inspect the statements that need target mappings. </p>',
     )
   );
 }
@@ -238,7 +245,7 @@ function renderExperiment(r) {
 
 /** Explain target limitations before offering a conversion preview or optional fragment. */
 function renderExport() {
-  return `<p class="helper">Render a supported configuration fragment from the current semantic model. Missing feature mappings remain explicit. No output is applied to a device.</p><form id="export-form"><div class="field-row"><label class="field">Target platform<select id="export-vendor"><option value="routeros">RouterOS</option><option value="cisco-ios">Cisco IOS · ACL</option></select></label><label class="field">Target version<input id="export-version" value="source" required></label></div><label class="toggle-row"><span>Allow a clearly labelled partial fragment</span><input id="export-partial" type="checkbox"></label><button class="button primary small" ${state.engineReady ? '' : 'disabled'}>Preview conversion</button></form><div id="export-result" role="status"></div><p class="model-note">RouterOS export targets 7.1–7.19 syntax. IOS export produces an unattached named ACL. Interfaces, PPP, RADIUS, SNMP and other inspection-only features block full export.</p>`;
+  return `<p class="helper">Export the complete RouterOS configuration with your semantic edits. The generated output is checked by re-importing it.</p><form id="export-form"><div class="field-row"><label class="field">Target platform<select id="export-vendor"><option value="routeros">RouterOS</option><option value="cisco-ios">Cisco IOS · ACL</option></select></label><label class="field">Target version<input id="export-version" value="source" required></label></div><label id="export-partial-option" class="toggle-row" hidden><span>Allow a clearly labelled partial fragment</span><input id="export-partial" type="checkbox"></label><button class="button primary small" ${state.engineReady ? '' : 'disabled'}>Generate preview</button></form><div id="export-result" role="status"></div><p class="model-note">Use source to preserve the original RouterOS syntax. Concrete versions are checked for supported migration boundaries. Cisco IOS is a separate ACL conversion target.</p>`;
 }
 
 /** Render only the selected tab, then install its action callbacks on the new controls.

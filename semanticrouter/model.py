@@ -57,7 +57,7 @@ class Address:
 
 @dataclass
 class Interface:
-    """Inspection-level interface, aggregation or VLAN configuration.
+    """Interface, aggregation or VLAN configuration with explicit link settings.
 
     Members belong to a bond, parent identifies a VLAN carrier, and ``enabled``
     reflects configuration rather than operational link state."""
@@ -71,6 +71,14 @@ class Interface:
     vlan: int | None = None
     comment: str = ""
     source: Source | None = None
+    # None means the export did not explicitly configure the property. Empty
+    # advertised modes are distinct from an absent advertise property.
+    vlan_filtering: bool | None = field(
+        default=None, metadata={"inherit_source_if_absent": True}
+    )
+    advertised_link_modes: list[str] | None = field(
+        default=None, metadata={"inherit_source_if_absent": True}
+    )
 
 
 @dataclass
@@ -219,7 +227,8 @@ class Router:
     """A mutable, vendor-neutral snapshot of explicit router configuration.
 
     The model is intentionally partial. Diagnostics describe unresolved meaning,
-    while ``unexported`` records source commands without complete export mappings.
+    while the legacy ``unexported`` field records portable-conversion gaps, not
+    statements omitted from source-aware RouterOS output.
     Neither list implies a device is reachable or that a conversion can be deployed."""
 
     name: str
@@ -244,4 +253,12 @@ class Router:
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-compatible deep copy, preserving order and uncertainty metadata."""
-        return asdict(self)
+        values = asdict(self)
+        # Keep older workspaces older until they acquire a new projection. Emitting
+        # default nulls here would incorrectly turn absent fields into explicit
+        # requests to remove settings during a subsequent source-aware export.
+        for interface, value in zip(self.interfaces, values["interfaces"]):
+            for name in getattr(interface, "_absent_projections", ()):
+                if getattr(interface, name) is None:
+                    value.pop(name, None)
+        return values

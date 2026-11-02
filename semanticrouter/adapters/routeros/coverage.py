@@ -1,4 +1,4 @@
-"""Track which imported properties have complete semantic export mappings.
+"""Track properties outside the portable conversion renderer, not native export.
 
 This check is independent of inspection: a router can be useful for auditing while
 still carrying commands that prevent a cross-platform conversion. Complete native
@@ -7,7 +7,7 @@ pretend those statements have portable semantic mappings."""
 
 from ipaddress import ip_interface, ip_network
 
-IMPORT_COVERAGE = {
+PORTABLE_PROPERTIES = {
     "/system identity": {"name"},
     "/ip dns": {"servers"},
     "/ip address": {"address", "network", "interface", "disabled"},
@@ -76,16 +76,18 @@ IMPORT_COVERAGE = {
 }
 
 
-def mark_import_coverage(router, commands):
-    """Record each command whose complete semantics cannot be exported.
+def mark_conversion_coverage(router, commands):
+    """Record statements outside the portable renderer's property mappings.
 
-    Inspection success is deliberately independent of conversion coverage. Selectors,
+    This is not a RouterOS feature or native-export support counter. Typed
+    interface settings, for example, are imported and exported natively even
+    though the portable renderer does not translate interfaces. Selectors,
     unsupported properties, interface-based update sources and nonportable peer
     addressing all keep a source reference in ``router.unexported``."""
     router.unexported = []
     for c in commands:
         attrs = c.attributes
-        known = IMPORT_COVERAGE.get(c.path, set())
+        known = PORTABLE_PROPERTIES.get(c.path, set())
         if c.path == "/routing bgp instance" and router.platform.family == "6":
             known = known | {
                 "redistribute-connected",
@@ -131,7 +133,7 @@ def mark_import_coverage(router, commands):
             c.opaque
             or c.verb not in ("add", "set")
             or not selector_ok
-            or c.path not in IMPORT_COVERAGE
+            or c.path not in PORTABLE_PROPERTIES
             or not set(attrs) <= known
         ):
             router.unexported.append(c.source)

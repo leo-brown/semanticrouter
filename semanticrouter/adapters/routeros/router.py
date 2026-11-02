@@ -2,17 +2,18 @@
 
 Only explicit configuration evidence is mapped. Credentials and subscriber secret
 records have no semantic field, and raw text is excluded from dataclass reprs.
-The final coverage pass records source references for every unmapped command."""
+The final pass records portable-conversion limits independently of native export."""
 
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from ...definitions import detect
-from ...model import Address, Diagnostic, Interface, PPPServer, RadiusServer, Router
+from ...model import Address, Diagnostic, PPPServer, RadiusServer, Router
 from .bgp import RouterOSBGP
-from .coverage import mark_import_coverage
+from .coverage import mark_conversion_coverage
 from .firewall import RouterOSFirewallV4, firewall_rule
+from .interfaces import interface_from_command
 from .parser import Command, parse
 from .values import enabled, milliseconds
 
@@ -47,7 +48,7 @@ class RouterOSRouter:
         return RouterOSBGP(self.commands, p.family)
 
     def to_common(self):
-        """Build a new common snapshot and then assess complete export coverage.
+        """Build a new common snapshot and then assess portable conversion coverage.
 
         Settings are derived from explicit recognized statements. Device-dependent
         selectors remain diagnostic; arbitrary edit scripts are not reconstructed. ROS6
@@ -114,20 +115,9 @@ class RouterOSRouter:
                 "/interface vlan",
                 "/interface ethernet",
             ):
-                if a.get("name"):
-                    r.interfaces.append(
-                        Interface(
-                            a["name"],
-                            p.split()[-1],
-                            enabled(a),
-                            a.get("slaves", "").split(",") if a.get("slaves") else [],
-                            a.get("mode"),
-                            a.get("interface"),
-                            int(a["vlan-id"]) if "vlan-id" in a else None,
-                            a.get("comment", ""),
-                            c.source,
-                        )
-                    )
+                interface = interface_from_command(c)
+                if interface is not None:
+                    r.interfaces.append(interface)
             elif p == "/snmp":
                 if "enabled" in a:
                     r.snmp_enabled = a["enabled"] == "yes"
@@ -166,7 +156,7 @@ class RouterOSRouter:
                 r.ospf_interfaces.extend(
                     filter(None, a.get("interfaces", "").split(","))
                 )
-        mark_import_coverage(r, self.commands)
+        mark_conversion_coverage(r, self.commands)
         if r.platform.family == "6":
             for chain in {p.chain for p in r.bgp.policies}:
                 rules = [p for p in r.bgp.policies if p.chain == chain and p.enabled]

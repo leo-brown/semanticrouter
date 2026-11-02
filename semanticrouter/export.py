@@ -1,8 +1,8 @@
-"""Capability-checked export orchestration over the common router model.
+"""Dispatch source-aware RouterOS export separately from portable conversion.
 
-Renderers return output plus omissions. A complete export is refused whenever an
-imported property, common feature or unresolved diagnostic lacks a mapping. Partial
-fragments require an explicit opt-in and carry a visible banner.
+Native export preserves original settings and verifies the requested semantic edits.
+Portable renderers require a target mapping for every feature; their omissions block
+complete conversion. Partial fragments need explicit opt-in and a visible banner.
 """
 
 from .renderers import ios, routeros
@@ -56,10 +56,10 @@ def export_router(
 
     if router.unexported:
         issue(
-            f"{len(router.unexported)} source commands contain unmapped features/properties; full-device export is blocked."
+            f"{len(router.unexported)} statements lack portable target mappings; complete conversion is blocked."
         )
     if router.firewall_v4.connection_tracking is not None:
-        issue("Connection tracking setting is not exported.")
+        issue("The selected converter does not render connection tracking.")
     if (
         router.interfaces
         or router.firewall_v6
@@ -68,7 +68,7 @@ def export_router(
         or router.snmp_enabled is not None
     ):
         issue(
-            "Interfaces, IPv6, PPP, RADIUS and SNMP are inspection-only in this release."
+            "The selected converter does not render interfaces, IPv6, PPP, RADIUS or SNMP. Complete RouterOS export uses the original configuration."
         )
     if router.diagnostics and any(
         d.code not in ("version-unknown",) for d in router.diagnostics
@@ -78,7 +78,7 @@ def export_router(
         issue("Unresolved route-policy semantics.")
     # A manually constructed model can contain features without source provenance.
     if router.ospf_interfaces or router.ppp_local_addresses:
-        issue("OSPF/PPP profile export unsupported.")
+        issue("The selected converter does not render OSPF or PPP profiles.")
     complete = not diagnostics
     if not complete and not allow_partial:
         raise UnsupportedExport("\n".join(diagnostics))

@@ -79,7 +79,7 @@ test('standalone startup, JSON edit and reset work through the real module graph
     snmp_enabled: null,
     snmp_location: null,
     diagnostics: [],
-    unexported: [],
+    unexported: [{ path: 'demo.cfg', line: 1 }],
   };
   const saved = new Map();
   globalThis.localStorage = {
@@ -192,6 +192,22 @@ test('standalone startup, JSON edit and reset work through the real module graph
       true,
       'rule catalog is hidden outside test design',
     );
+    stages.find((button) => button.dataset.stage === 'export').onclick();
+    assert.match(
+      element('#ide-editor').innerHTML,
+      /id="ide-conversion-gaps"[^>]*hidden/,
+    );
+    element('#ide-vendor').value = 'cisco-ios';
+    element('#ide-vendor').onchange();
+    assert.equal(element('#ide-conversion-gaps').hidden, false);
+    assert.equal(element('#ide-partial-option').hidden, false);
+    element('#ide-export-result').innerHTML = 'Old target preview';
+    element('#ide-vendor').value = 'routeros';
+    element('#ide-vendor').onchange();
+    assert.equal(element('#ide-conversion-gaps').hidden, true);
+    assert.equal(element('#ide-partial-option').hidden, true);
+    assert.equal(element('#ide-export-result').innerHTML, '');
+    assert.equal(element('#ide-version').value, 'source');
     stages.find((button) => button.dataset.stage === 'rules').onclick();
     assert.equal(element('#test-design').hidden, false);
     assert.equal(element('#new-rule-kind').value, 'field');

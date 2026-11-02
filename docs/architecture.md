@@ -6,21 +6,22 @@ module connects to devices or evaluates configuration text as executable code.
 
 ## Modules
 
-| Module                                         | Responsibility                                                                        |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `semanticrouter/model.py`                      | Dataclass feature domains, provenance and explicit unknown/unsupported state          |
-| `semanticrouter/definitions.py`                | Bundled firmware definitions and independent hardware/version evidence                |
-| `semanticrouter/adapters/routeros/parser.py`   | Non-executing tokenization, sections, continuations, property groups and source lines |
-| `semanticrouter/adapters/routeros/firewall.py` | Firewall predicates, address groups and tracking state                                |
-| `semanticrouter/adapters/routeros/bgp.py`      | BGP inheritance, redistribution normalization and supported route-rule translation    |
-| `semanticrouter/adapters/routeros/router.py`   | Feature assembly and inspection-level addresses/interfaces/services                   |
-| `semanticrouter/adapters/routeros/coverage.py` | Command/property coverage independent of inspection success                           |
-| `semanticrouter/evaluation.py`                 | Pure, ordered firewall and route evaluation                                           |
-| `semanticrouter/policy.py`                     | Generic explicit-suite auditing; named compatibility helper                           |
-| `semanticrouter/renderers/`                    | Target-specific RouterOS and IOS syntax                                               |
-| `semanticrouter/export.py`                     | Target dispatch and shared completeness enforcement                                   |
-| `semanticrouter/serialization.py`              | Strict hydration of JSON into declared dataclass types                                |
-| `semanticrouter/cli.py`                        | Inspection/audit/export CLI and documented exit statuses                              |
+| Module                                           | Responsibility                                                                        |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `semanticrouter/model.py`                        | Dataclass feature domains, provenance and explicit unknown/unsupported state          |
+| `semanticrouter/definitions.py`                  | Bundled firmware definitions and independent hardware/version evidence                |
+| `semanticrouter/adapters/routeros/parser.py`     | Non-executing tokenization, sections, continuations, property groups and source lines |
+| `semanticrouter/adapters/routeros/firewall.py`   | Firewall predicates, address groups and tracking state                                |
+| `semanticrouter/adapters/routeros/bgp.py`        | BGP inheritance, redistribution normalization and supported route-rule translation    |
+| `semanticrouter/adapters/routeros/interfaces.py` | Typed interfaces, bridge VLAN filtering and advertised link modes                     |
+| `semanticrouter/adapters/routeros/router.py`     | Feature assembly and inspection-level addresses/interfaces/services                   |
+| `semanticrouter/adapters/routeros/coverage.py`   | Portable conversion limits, independent of RouterOS native export                     |
+| `semanticrouter/evaluation.py`                   | Pure, ordered firewall and route evaluation                                           |
+| `semanticrouter/policy.py`                       | Generic explicit-suite auditing; named compatibility helper                           |
+| `semanticrouter/renderers/`                      | Target-specific RouterOS and IOS syntax                                               |
+| `semanticrouter/export.py`                       | Target dispatch and shared completeness enforcement                                   |
+| `semanticrouter/serialization.py`                | Strict hydration of JSON into declared dataclass types                                |
+| `semanticrouter/cli.py`                          | Inspection/audit/export CLI and documented exit statuses                              |
 
 The public imports `semanticrouter.load`, `RouterOSRouter` and
 `semanticrouter.adapters.routeros.parse` remain stable. The RouterOS adapter is a
@@ -35,16 +36,17 @@ and private fields, and requires functional-model and native-ledger round-trip e
 `RouterOSRouter.to_common()` attaches the private in-memory source artifact used by
 Python exports. JSON hydration intentionally does not restore it; browser export
 supplies an explicit authenticated original. Source presence is not required by audits
-or tests. `unexported` records semantic translation coverage, not omissions from native
-preservation. See [export](export.md) for target/layout boundaries and the comparison
-contract.
+or tests. The legacy `unexported` list records portable-renderer limits, not native
+export omissions or a count of unsupported RouterOS objects. See [export](export.md) for
+target/layout boundaries and the comparison contract.
 
 ## Evidence and uncertainty
 
 A parser command retains vendor attributes, selector text and source file/line. Feature
 adapters create normalized objects and discard credentials that have no semantic field.
-Unknown firewall matchers remain opaque constraints. Unmodelled commands retain source
-references in `Router.unexported`.
+Unknown firewall matchers remain opaque constraints. Statements without portable
+conversion mappings retain source references in `Router.unexported`, even when their
+feature is typed and editable through RouterOS source export.
 
 These are different questions: can an object be inspected, can a predicate be proved,
 and can every imported feature be rendered? A model can support useful inspection while
